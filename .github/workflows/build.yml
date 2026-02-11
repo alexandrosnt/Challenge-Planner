@@ -122,9 +122,11 @@ jobs:
           NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
 
       - name: Sign APK
-        if: ${{ secrets.ANDROID_KEY_BASE64 != '' }}
+        if: env.HAS_SIGNING_KEY == 'true'
         id: sign-apk
         uses: r0adkll/sign-android-release@v1
+        env:
+          HAS_SIGNING_KEY: ${{ secrets.ANDROID_KEY_BASE64 != '' }}
         with:
           releaseDirectory: src-tauri/gen/android/app/build/outputs/apk/universal/release
           signingKeyBase64: ${{ secrets.ANDROID_KEY_BASE64 }}
