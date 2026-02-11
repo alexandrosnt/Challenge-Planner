@@ -1,0 +1,60 @@
+@import 'remixicon/fonts/remixicon.css';
+
+:root {
+	/* Professional Palette */
+	--primary-gradient: linear-gradient(135deg, #FF9A9E 0%, #FECFEF 100%);
+	--glass-bg: rgba(255, 255, 255, 0.65);
+	--glass-border: rgba(255, 255, 255, 0.8);
+	--glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
+
+	--text-dark: #4A4A4A;
+	--text-soft: #888888;
+	--accent-pink: #FF6B81;
+	--accent-sage: #94B49F;
+
+	--radius-l: 28px;
+	--radius-m: 20px;
+	--radius-s: 12px;
+}
+
+* {
+	margin: 0;
+	padding: 0;
+	box-sizing: border-box;
+	-webkit-tap-highlight-color: transparent;
+}
+
+body {
+	font-family: 'Poppins', sans-serif;
+	background: #fdfbf7;
+	background-image:
+		radial-gradient(at 0% 0%, hsla(353, 100%, 92%, 1) 0, transparent 50%),
+		radial-gradient(at 50% 0%, hsla(22, 100%, 92%, 1) 0, transparent 50%),
+		radial-gradient(at 100% 0%, hsla(335, 100%, 93%, 1) 0, transparent 50%);
+	background-size: 200% 200%;
+	animation: gradientBG 15s ease infinite;
+	color: var(--text-dark);
+	height: 100vh;
+	overflow: hidden;
+	display: flex;
+	flex-direction: column;
+}
+
+@keyframes gradientBG {
+	0% { background-position: 0% 50%; }
+	50% { background-position: 100% 50%; }
+	100% { background-position: 0% 50%; }
+}
+
+main {
+	flex: 1;
+	overflow-y: auto;
+	overflow-x: hidden;
+	padding: 10px 24px 120px 24px;
+	-ms-overflow-style: none;
+	scrollbar-width: none;
+}
+
+main::-webkit-scrollbar {
+	display: none;
+}

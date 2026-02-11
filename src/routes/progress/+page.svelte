@@ -1,0 +1,555 @@
+<script lang="ts">
+    import { onMount } from 'svelte';
+    import GlassCard from '$lib/components/GlassCard.svelte';
+    import ProgressRing from '$lib/components/ProgressRing.svelte';
+    import ProgressBar from '$lib/components/ProgressBar.svelte';
+    import SectionTitle from '$lib/components/SectionTitle.svelte';
+    import { loadProgressData, type ProgressData } from '$lib/db/queries';
+    import { getAuthState } from '$lib/stores/auth.svelte';
+    import { goto } from '$app/navigation';
+
+    let auth = getAuthState();
+
+    let data = $state<ProgressData | null>(null);
+
+    let completionRate = $derived(
+        data && data.total_items > 0
+            ? Math.round((data.used_up_items / data.total_items) * 100)
+            : 0
+    );
+
+    let challengeRate = $derived(
+        data && data.challenges_total > 0
+            ? Math.round((data.challenges_completed / data.challenges_total) * 100)
+            : 0
+    );
+
+    let achievementRate = $derived(
+        data && data.achievements_total > 0
+            ? Math.round((data.achievements_unlocked / data.achievements_total) * 100)
+            : 0
+    );
+
+    onMount(async () => {
+        const userId = auth.currentUser?.id;
+        if (!userId) return;
+        try {
+            data = await loadProgressData(userId);
+        } catch (e) {
+            console.error('Failed to load progress data:', e);
+        }
+    });
+</script>
+
+<!-- Header -->
+<header class="page-header">
+    <button class="back-btn" aria-label="Go back" onclick={() => goto('/')}>
+        <i class="ri-arrow-left-s-line"></i>
+    </button>
+    <h1 class="page-title">My Progress</h1>
+    <div class="header-spacer"></div>
+</header>
+
+<main>
+    {#if data}
+        <!-- Hero Ring -->
+        <div class="hero-ring">
+            <ProgressRing value={completionRate} size={120} strokeWidth={7} />
+            <p class="hero-label">
+                {data.used_up_items} of {data.total_items} products finished
+            </p>
+        </div>
+
+        <!-- Stats Row -->
+        <GlassCard>
+            <div class="stats-grid">
+                <div class="stat-block">
+                    <i class="ri-check-double-line stat-icon sage"></i>
+                    <span class="stat-value">{data.used_up_items}</span>
+                    <span class="stat-label">Used Up</span>
+                </div>
+                <div class="stat-block">
+                    <i class="ri-play-circle-line stat-icon pink"></i>
+                    <span class="stat-value">{data.active_items}</span>
+                    <span class="stat-label">Active</span>
+                </div>
+                <div class="stat-block">
+                    <i class="ri-delete-bin-line stat-icon pink"></i>
+                    <span class="stat-value">{data.decluttered_items}</span>
+                    <span class="stat-label">Decluttered</span>
+                </div>
+                <div class="stat-block">
+                    <i class="ri-refresh-line stat-icon sage"></i>
+                    <span class="stat-value">{data.total_usage_count}</span>
+                    <span class="stat-label">Total Uses</span>
+                </div>
+            </div>
+        </GlassCard>
+
+        <!-- Declutter Summary -->
+        {#if data.declutter.donated + data.declutter.sold + data.declutter.gifted + data.declutter.trashed > 0}
+            <SectionTitle title="Declutter Summary" actionText="View All" onAction={() => goto('/declutter')} />
+            <GlassCard>
+                <div class="declutter-grid">
+                    <div class="declutter-item">
+                        <i class="ri-heart-line declutter-icon donated"></i>
+                        <span class="declutter-value">{data.declutter.donated}</span>
+                        <span class="declutter-label">Donated</span>
+                    </div>
+                    <div class="declutter-item">
+                        <i class="ri-money-dollar-circle-line declutter-icon sold"></i>
+                        <span class="declutter-value">{data.declutter.sold}</span>
+                        <span class="declutter-label">Sold</span>
+                    </div>
+                    <div class="declutter-item">
+                        <i class="ri-gift-line declutter-icon gifted"></i>
+                        <span class="declutter-value">{data.declutter.gifted}</span>
+                        <span class="declutter-label">Gifted</span>
+                    </div>
+                    <div class="declutter-item">
+                        <i class="ri-delete-bin-line declutter-icon trashed"></i>
+                        <span class="declutter-value">{data.declutter.trashed}</span>
+                        <span class="declutter-label">Trashed</span>
+                    </div>
+                </div>
+                {#if data.declutter.total_recovered > 0}
+                    <div class="recovered-banner">
+                        <i class="ri-coins-line"></i>
+                        <span>{data.declutter.total_recovered.toFixed(2)}€ recovered from sold items</span>
+                    </div>
+                {/if}
+            </GlassCard>
+        {/if}
+
+        <!-- Category Progress -->
+        {#if data.category_progress.length > 0}
+            <SectionTitle title="By Category" actionText="" />
+            <GlassCard>
+                {#each data.category_progress as cat (cat.category_id)}
+                    <div class="category-row">
+                        <div class="category-info">
+                            <i class="{cat.category_icon} category-icon"></i>
+                            <span class="category-name">{cat.category_name}</span>
+                        </div>
+                        <div class="category-bar">
+                            <ProgressBar
+                                value={cat.total > 0 ? Math.round((cat.used_up / cat.total) * 100) : 0}
+                                height="6px"
+                            />
+                        </div>
+                        <span class="category-count">{cat.used_up}/{cat.total}</span>
+                        {#if cat.decluttered > 0}
+                            <span class="category-declutter" title="Decluttered">
+                                <i class="ri-delete-bin-line"></i>{cat.decluttered}
+                            </span>
+                        {/if}
+                    </div>
+                {/each}
+            </GlassCard>
+        {/if}
+
+        <!-- Challenges & Achievements -->
+        <SectionTitle title="Milestones" actionText="" />
+        <div class="milestones-row">
+            <GlassCard style="flex: 1; text-align: center;">
+                <ProgressRing
+                    value={challengeRate}
+                    size={64}
+                    strokeWidth={5}
+                    color="var(--accent-pink)"
+                />
+                <p class="milestone-value">{data.challenges_completed}/{data.challenges_total}</p>
+                <p class="milestone-label">Challenges</p>
+            </GlassCard>
+            <GlassCard style="flex: 1; text-align: center;">
+                <ProgressRing
+                    value={achievementRate}
+                    size={64}
+                    strokeWidth={5}
+                    color="var(--accent-sage)"
+                />
+                <p class="milestone-value">{data.achievements_unlocked}/{data.achievements_total}</p>
+                <p class="milestone-label">Achievements</p>
+            </GlassCard>
+        </div>
+
+        <!-- Streak Highlight -->
+        <GlassCard style="background: linear-gradient(135deg, #FFF3E0, #FFE0B2); border: none;">
+            <div class="streak-card">
+                <i class="ri-fire-line streak-fire"></i>
+                <div class="streak-stats">
+                    <div class="streak-stat">
+                        <span class="streak-value">{data.best_streak}</span>
+                        <span class="streak-label">Best Streak</span>
+                    </div>
+                    <div class="streak-divider"></div>
+                    <div class="streak-stat">
+                        <span class="streak-value">{data.current_streak}</span>
+                        <span class="streak-label">Current</span>
+                    </div>
+                </div>
+            </div>
+        </GlassCard>
+    {:else}
+        <!-- Skeleton Preloader -->
+        <div class="skeleton-hero">
+            <div class="skeleton-ring shimmer"></div>
+            <div class="skeleton-line shimmer" style="width: 180px; height: 14px; margin-top: 14px;"></div>
+        </div>
+        <GlassCard>
+            <div class="stats-grid">
+                {#each Array(4) as _}
+                    <div class="stat-block">
+                        <div class="skeleton-circle shimmer" style="width: 22px; height: 22px;"></div>
+                        <div class="skeleton-line shimmer" style="width: 40px; height: 24px;"></div>
+                        <div class="skeleton-line shimmer" style="width: 56px; height: 10px;"></div>
+                    </div>
+                {/each}
+            </div>
+        </GlassCard>
+        <div class="skeleton-line shimmer" style="width: 130px; height: 18px; margin-bottom: 15px;"></div>
+        <GlassCard>
+            <div class="declutter-grid">
+                {#each Array(4) as _}
+                    <div class="declutter-item">
+                        <div class="skeleton-circle shimmer" style="width: 40px; height: 40px;"></div>
+                        <div class="skeleton-line shimmer" style="width: 28px; height: 20px;"></div>
+                        <div class="skeleton-line shimmer" style="width: 42px; height: 10px;"></div>
+                    </div>
+                {/each}
+            </div>
+        </GlassCard>
+        <div class="skeleton-line shimmer" style="width: 100px; height: 18px; margin-bottom: 15px;"></div>
+        <GlassCard>
+            {#each Array(3) as _}
+                <div class="skeleton-cat-row">
+                    <div class="skeleton-circle shimmer" style="width: 18px; height: 18px;"></div>
+                    <div class="skeleton-line shimmer" style="width: 70px; height: 13px;"></div>
+                    <div class="skeleton-line shimmer" style="flex: 1; height: 6px; border-radius: 10px;"></div>
+                    <div class="skeleton-line shimmer" style="width: 30px; height: 12px;"></div>
+                </div>
+            {/each}
+        </GlassCard>
+        <div class="skeleton-line shimmer" style="width: 90px; height: 18px; margin-bottom: 15px;"></div>
+        <div class="milestones-row">
+            <GlassCard style="flex: 1; text-align: center; padding: 20px;">
+                <div class="skeleton-ring-sm shimmer"></div>
+                <div class="skeleton-line shimmer" style="width: 40px; height: 14px; margin: 10px auto 0;"></div>
+            </GlassCard>
+            <GlassCard style="flex: 1; text-align: center; padding: 20px;">
+                <div class="skeleton-ring-sm shimmer"></div>
+                <div class="skeleton-line shimmer" style="width: 60px; height: 14px; margin: 10px auto 0;"></div>
+            </GlassCard>
+        </div>
+        <GlassCard>
+            <div class="skeleton-streak">
+                <div class="skeleton-circle shimmer" style="width: 36px; height: 36px;"></div>
+                <div class="skeleton-line shimmer" style="width: 60px; height: 28px;"></div>
+                <div class="skeleton-line shimmer" style="width: 60px; height: 28px;"></div>
+            </div>
+        </GlassCard>
+    {/if}
+</main>
+
+<style>
+    /* Header */
+    .page-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 16px 24px;
+    }
+    .back-btn {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        border: none;
+        background: var(--glass-bg);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 22px;
+        color: var(--text-dark);
+        cursor: pointer;
+        box-shadow: var(--glass-shadow);
+        transition: transform 0.2s;
+    }
+    .back-btn:active {
+        transform: scale(0.9);
+    }
+    .page-title {
+        font-size: 20px;
+        font-weight: 700;
+        color: var(--text-dark);
+        letter-spacing: -0.3px;
+    }
+    .header-spacer {
+        width: 40px;
+    }
+
+    /* Hero Ring */
+    .hero-ring {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 24px 0 28px;
+    }
+    .hero-label {
+        margin-top: 14px;
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--text-soft);
+    }
+
+    /* Stats Grid */
+    .stats-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+    }
+    .stat-block {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+    }
+    .stat-icon {
+        font-size: 22px;
+        margin-bottom: 2px;
+    }
+    .stat-icon.pink {
+        color: var(--accent-pink);
+    }
+    .stat-icon.sage {
+        color: var(--accent-sage);
+    }
+    .stat-value {
+        font-size: 24px;
+        font-weight: 700;
+        color: var(--text-dark);
+    }
+    .stat-label {
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--text-soft);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    /* Declutter Summary */
+    .declutter-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr 1fr;
+        gap: 12px;
+        text-align: center;
+    }
+    .declutter-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+    }
+    .declutter-icon {
+        font-size: 22px;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .declutter-icon.donated { color: #E91E63; background: #FCE4EC; }
+    .declutter-icon.sold { color: #4CAF50; background: #E8F5E9; }
+    .declutter-icon.gifted { color: #FF9800; background: #FFF3E0; }
+    .declutter-icon.trashed { color: #9E9E9E; background: #F5F5F5; }
+    .declutter-value {
+        font-size: 20px;
+        font-weight: 700;
+        color: var(--text-dark);
+    }
+    .declutter-label {
+        font-size: 10px;
+        font-weight: 600;
+        color: var(--text-soft);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    .recovered-banner {
+        margin-top: 16px;
+        padding: 10px 14px;
+        background: #E8F5E9;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        font-weight: 600;
+        color: #2E7D32;
+    }
+    .recovered-banner i {
+        font-size: 18px;
+    }
+
+    /* Category Progress */
+    .category-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 0;
+    }
+    .category-row:not(:last-child) {
+        border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+    }
+    .category-info {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 100px;
+    }
+    .category-icon {
+        font-size: 18px;
+        color: var(--accent-pink);
+    }
+    .category-name {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text-dark);
+    }
+    .category-bar {
+        flex: 1;
+    }
+    .category-count {
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--text-soft);
+        min-width: 36px;
+        text-align: right;
+    }
+    .category-declutter {
+        display: flex;
+        align-items: center;
+        gap: 2px;
+        font-size: 11px;
+        font-weight: 600;
+        color: #9E9E9E;
+        background: #F5F5F5;
+        padding: 2px 6px;
+        border-radius: 6px;
+    }
+    .category-declutter i {
+        font-size: 12px;
+    }
+
+    /* Milestones Row */
+    .milestones-row {
+        display: flex;
+        gap: 12px;
+        margin-bottom: 0;
+    }
+    .milestone-value {
+        font-size: 16px;
+        font-weight: 700;
+        color: var(--text-dark);
+        margin-top: 10px;
+    }
+    .milestone-label {
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--text-soft);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-top: 2px;
+    }
+
+    /* Streak Highlight */
+    .streak-card {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+    }
+    .streak-fire {
+        font-size: 36px;
+        color: #FF6B35;
+    }
+    .streak-stats {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        flex: 1;
+    }
+    .streak-stat {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        flex: 1;
+    }
+    .streak-value {
+        font-size: 28px;
+        font-weight: 700;
+        color: var(--text-dark);
+    }
+    .streak-label {
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--text-soft);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    .streak-divider {
+        width: 1px;
+        height: 40px;
+        background: rgba(0, 0, 0, 0.1);
+    }
+
+    /* Skeleton Preloader */
+    .shimmer {
+        background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+        background-size: 200% 100%;
+        animation: shimmer 1.5s infinite;
+        border-radius: 8px;
+    }
+    @keyframes shimmer {
+        0% { background-position: 200% 0; }
+        100% { background-position: -200% 0; }
+    }
+    .skeleton-hero {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 24px 0 28px;
+    }
+    .skeleton-ring {
+        width: 120px;
+        height: 120px;
+        border-radius: 50%;
+    }
+    .skeleton-ring-sm {
+        width: 64px;
+        height: 64px;
+        border-radius: 50%;
+        margin: 0 auto;
+    }
+    .skeleton-line {
+        display: inline-block;
+    }
+    .skeleton-circle {
+        border-radius: 50%;
+    }
+    .skeleton-cat-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 0;
+    }
+    .skeleton-cat-row:not(:last-child) {
+        border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+    }
+    .skeleton-streak {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        justify-content: center;
+    }
+</style>
