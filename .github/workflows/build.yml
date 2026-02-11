@@ -121,7 +121,8 @@ jobs:
           NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
 
       - name: Sign APK
-        if: ${{ env.HAS_SIGNING_SECRETS == 'true' }}
+        if: ${{ secrets.ANDROID_KEY_BASE64 != '' }}
+        id: sign-apk
         uses: r0adkll/sign-android-release@v1
         with:
           releaseDirectory: src-tauri/gen/android/app/build/outputs/apk/universal/release
@@ -129,8 +130,6 @@ jobs:
           alias: ${{ secrets.ANDROID_KEY_ALIAS }}
           keyStorePassword: ${{ secrets.ANDROID_KEY_PASSWORD }}
           keyPassword: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        env:
-          HAS_SIGNING_SECRETS: ${{ secrets.ANDROID_KEY_BASE64 != '' }}
 
       - name: Upload APK to release
         uses: softprops/action-gh-release@v2
