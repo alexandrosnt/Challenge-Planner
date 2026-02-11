@@ -7,6 +7,7 @@
     import { getAuthState } from '$lib/stores/auth.svelte';
     import { dragscroll } from '$lib/actions/dragscroll';
     import { onMount } from 'svelte';
+    import { t } from '$lib/i18n/index.svelte';
 
     let auth = getAuthState();
 
@@ -94,8 +95,8 @@
 
 <header style="padding: 20px 24px;">
     <div>
-        <p style="font-size: 14px; color: var(--text-soft); font-weight: 500;">Your Products</p>
-        <h1 style="font-size: 26px; font-weight: 700; letter-spacing: -0.5px;">Inventory</h1>
+        <p style="font-size: 14px; color: var(--text-soft); font-weight: 500;">{t.inventory.yourProducts}</p>
+        <h1 style="font-size: 26px; font-weight: 700; letter-spacing: -0.5px;">{t.inventory.title}</h1>
     </div>
 </header>
 
@@ -103,7 +104,7 @@
     <!-- Category Filter -->
     <div class="filter-scroll" use:dragscroll>
         <button class="filter-pill" class:active={selectedCategoryId === 0} onclick={() => handleCategorySelect(0)}>
-            All
+            {t.common.all}
         </button>
         {#each categories as cat (cat.id)}
             <button class="filter-pill" class:active={selectedCategoryId === cat.id} onclick={() => handleCategorySelect(cat.id)}>
@@ -124,16 +125,16 @@
     <!-- Status Tabs -->
     <div class="status-tabs" use:dragscroll>
         <button class="status-tab" class:active={selectedStatus === 'all'} onclick={() => selectedStatus = 'all'}>
-            All ({statusCounts.all})
+            {t.common.all} ({statusCounts.all})
         </button>
         <button class="status-tab" class:active={selectedStatus === 'active'} onclick={() => selectedStatus = 'active'}>
-            Active ({statusCounts.active})
+            {t.common.active} ({statusCounts.active})
         </button>
         <button class="status-tab" class:active={selectedStatus === 'used_up'} onclick={() => selectedStatus = 'used_up'}>
-            Finished ({statusCounts.used_up})
+            {t.common.finished} ({statusCounts.used_up})
         </button>
         <button class="status-tab" class:active={selectedStatus === 'decluttered'} onclick={() => selectedStatus = 'decluttered'}>
-            Decluttered ({statusCounts.decluttered})
+            {t.common.decluttered} ({statusCounts.decluttered})
         </button>
     </div>
 
@@ -179,7 +180,7 @@
         {:else}
             <div class="empty-state">
                 <i class="ri-inbox-line"></i>
-                <p>No items yet. Add some from the + button!</p>
+                <p>{t.inventory.emptyState}</p>
             </div>
         {/each}
     </div>

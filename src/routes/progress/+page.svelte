@@ -7,6 +7,7 @@
     import { loadProgressData, type ProgressData } from '$lib/db/queries';
     import { getAuthState } from '$lib/stores/auth.svelte';
     import { goto } from '$app/navigation';
+    import { t } from '$lib/i18n/index.svelte';
 
     let auth = getAuthState();
 
@@ -46,7 +47,7 @@
     <button class="back-btn" aria-label="Go back" onclick={() => goto('/')}>
         <i class="ri-arrow-left-s-line"></i>
     </button>
-    <h1 class="page-title">My Progress</h1>
+    <h1 class="page-title">{t.progress.title}</h1>
     <div class="header-spacer"></div>
 </header>
 
@@ -56,7 +57,7 @@
         <div class="hero-ring">
             <ProgressRing value={completionRate} size={120} strokeWidth={7} />
             <p class="hero-label">
-                {data.used_up_items} of {data.total_items} products finished
+                {data.used_up_items} {t.progress.of} {data.total_items} {t.progress.productsFinished}
             </p>
         </div>
 
@@ -66,56 +67,56 @@
                 <div class="stat-block">
                     <i class="ri-check-double-line stat-icon sage"></i>
                     <span class="stat-value">{data.used_up_items}</span>
-                    <span class="stat-label">Used Up</span>
+                    <span class="stat-label">{t.progress.usedUp}</span>
                 </div>
                 <div class="stat-block">
                     <i class="ri-play-circle-line stat-icon pink"></i>
                     <span class="stat-value">{data.active_items}</span>
-                    <span class="stat-label">Active</span>
+                    <span class="stat-label">{t.progress.active}</span>
                 </div>
                 <div class="stat-block">
                     <i class="ri-delete-bin-line stat-icon pink"></i>
                     <span class="stat-value">{data.decluttered_items}</span>
-                    <span class="stat-label">Decluttered</span>
+                    <span class="stat-label">{t.progress.decluttered}</span>
                 </div>
                 <div class="stat-block">
                     <i class="ri-refresh-line stat-icon sage"></i>
                     <span class="stat-value">{data.total_usage_count}</span>
-                    <span class="stat-label">Total Uses</span>
+                    <span class="stat-label">{t.progress.totalUses}</span>
                 </div>
             </div>
         </GlassCard>
 
         <!-- Declutter Summary -->
         {#if data.declutter.donated + data.declutter.sold + data.declutter.gifted + data.declutter.trashed > 0}
-            <SectionTitle title="Declutter Summary" actionText="View All" onAction={() => goto('/declutter')} />
+            <SectionTitle title={t.progress.declutterSummary} actionText={t.common.viewAll} onAction={() => goto('/declutter')} />
             <GlassCard>
                 <div class="declutter-grid">
                     <div class="declutter-item">
                         <i class="ri-heart-line declutter-icon donated"></i>
                         <span class="declutter-value">{data.declutter.donated}</span>
-                        <span class="declutter-label">Donated</span>
+                        <span class="declutter-label">{t.progress.donated}</span>
                     </div>
                     <div class="declutter-item">
                         <i class="ri-money-dollar-circle-line declutter-icon sold"></i>
                         <span class="declutter-value">{data.declutter.sold}</span>
-                        <span class="declutter-label">Sold</span>
+                        <span class="declutter-label">{t.progress.sold}</span>
                     </div>
                     <div class="declutter-item">
                         <i class="ri-gift-line declutter-icon gifted"></i>
                         <span class="declutter-value">{data.declutter.gifted}</span>
-                        <span class="declutter-label">Gifted</span>
+                        <span class="declutter-label">{t.progress.gifted}</span>
                     </div>
                     <div class="declutter-item">
                         <i class="ri-delete-bin-line declutter-icon trashed"></i>
                         <span class="declutter-value">{data.declutter.trashed}</span>
-                        <span class="declutter-label">Trashed</span>
+                        <span class="declutter-label">{t.progress.trashed}</span>
                     </div>
                 </div>
                 {#if data.declutter.total_recovered > 0}
                     <div class="recovered-banner">
                         <i class="ri-coins-line"></i>
-                        <span>{data.declutter.total_recovered.toFixed(2)}€ recovered from sold items</span>
+                        <span>{data.declutter.total_recovered.toFixed(2)}€ {t.progress.recoveredFromSold}</span>
                     </div>
                 {/if}
             </GlassCard>
@@ -123,7 +124,7 @@
 
         <!-- Category Progress -->
         {#if data.category_progress.length > 0}
-            <SectionTitle title="By Category" actionText="" />
+            <SectionTitle title={t.progress.byCategory} actionText="" />
             <GlassCard>
                 {#each data.category_progress as cat (cat.category_id)}
                     <div class="category-row">
@@ -149,7 +150,7 @@
         {/if}
 
         <!-- Challenges & Achievements -->
-        <SectionTitle title="Milestones" actionText="" />
+        <SectionTitle title={t.progress.milestones} actionText="" />
         <div class="milestones-row">
             <GlassCard style="flex: 1; text-align: center;">
                 <ProgressRing
@@ -159,7 +160,7 @@
                     color="var(--accent-pink)"
                 />
                 <p class="milestone-value">{data.challenges_completed}/{data.challenges_total}</p>
-                <p class="milestone-label">Challenges</p>
+                <p class="milestone-label">{t.progress.challenges}</p>
             </GlassCard>
             <GlassCard style="flex: 1; text-align: center;">
                 <ProgressRing
@@ -169,7 +170,7 @@
                     color="var(--accent-sage)"
                 />
                 <p class="milestone-value">{data.achievements_unlocked}/{data.achievements_total}</p>
-                <p class="milestone-label">Achievements</p>
+                <p class="milestone-label">{t.progress.achievements}</p>
             </GlassCard>
         </div>
 
@@ -180,12 +181,12 @@
                 <div class="streak-stats">
                     <div class="streak-stat">
                         <span class="streak-value">{data.best_streak}</span>
-                        <span class="streak-label">Best Streak</span>
+                        <span class="streak-label">{t.progress.bestStreak}</span>
                     </div>
                     <div class="streak-divider"></div>
                     <div class="streak-stat">
                         <span class="streak-value">{data.current_streak}</span>
-                        <span class="streak-label">Current</span>
+                        <span class="streak-label">{t.progress.current}</span>
                     </div>
                 </div>
             </div>

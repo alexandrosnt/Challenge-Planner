@@ -1,15 +1,16 @@
 <script>
 	import { page } from '$app/state';
 	import { openAddModal } from '$lib/stores/modal.svelte';
+	import { t } from '$lib/i18n/index.svelte';
 
 	let currentPath = $derived(page.url.pathname);
 
 	const navItems = [
-		{ href: '/', icon: 'ri-home-5-fill', label: 'Home' },
-		{ href: '/inventory', icon: 'ri-archive-drawer-line', label: 'Inventory' },
-		{ icon: 'ri-add-line', label: 'Add', isCenter: true },
-		{ href: '/projects', icon: 'ri-trophy-line', label: 'Projects' },
-		{ href: '/insights', icon: 'ri-line-chart-line', label: 'Insights' },
+		{ href: '/', icon: 'ri-home-5-fill', label: t.nav.home },
+		{ href: '/inventory', icon: 'ri-archive-drawer-line', label: t.nav.inventory },
+		{ icon: 'ri-add-line', label: t.nav.add, isCenter: true },
+		{ href: '/projects', icon: 'ri-trophy-line', label: t.nav.projects },
+		{ href: '/insights', icon: 'ri-line-chart-line', label: t.nav.insights },
 	];
 </script>
 

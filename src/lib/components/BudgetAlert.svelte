@@ -1,5 +1,6 @@
 <script>
   import GlassCard from '$lib/components/GlassCard.svelte';
+  import { t } from '$lib/i18n/index.svelte';
 
   let { categoryName, spent, limit } = $props();
 
@@ -10,16 +11,16 @@
   <div class="alert-header">
     <div class="alert-label">
       <i class="ri-alert-line"></i>
-      <span>Low Buy Alert</span>
+      <span>{t.budgetAlert.lowBuyAlert}</span>
     </div>
     <span class="category-badge">{categoryName}</span>
   </div>
   <p class="alert-message">
-    You've spent <strong>{spent}€</strong> of your {limit}€ limit.
+    {t.budgetAlert.youveSpent} <strong>{spent}€</strong> {t.budgetAlert.ofYourLimit} {limit}€ {t.budgetAlert.limit}
     {#if remaining <= 5}
-      Maybe wait until next month?
+      {t.budgetAlert.maybeWait}
     {:else}
-      You have <strong>{remaining}€</strong> left.
+      {t.budgetAlert.youHave} <strong>{remaining}€</strong> {t.budgetAlert.left}
     {/if}
   </p>
 </GlassCard>

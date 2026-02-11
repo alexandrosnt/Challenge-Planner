@@ -1,6 +1,7 @@
 <script>
     import GlassCard from '$lib/components/GlassCard.svelte';
     import ProgressRing from '$lib/components/ProgressRing.svelte';
+    import { t } from '$lib/i18n/index.svelte';
 
     let { item, onPurchase, onRemove } = $props();
 
@@ -29,23 +30,23 @@
         </div>
 
         {#if isReady}
-            <div class="ready-badge">Ready to buy!</div>
+            <div class="ready-badge">{t.wishlist.readyToBuy}</div>
         {:else}
             <div class="countdown">
                 <i class="ri-time-line"></i>
-                {item.days_remaining} days remaining
+                {item.days_remaining} {t.wishlist.daysRemaining}
             </div>
         {/if}
 
         <div class="wishlist-actions">
             {#if isReady && onPurchase}
                 <button class="action-btn purchase" onclick={() => onPurchase(item)}>
-                    <i class="ri-shopping-bag-3-line"></i> Purchase
+                    <i class="ri-shopping-bag-3-line"></i> {t.wishlist.purchase}
                 </button>
             {/if}
             {#if onRemove}
                 <button class="action-btn remove" onclick={() => onRemove(item)}>
-                    <i class="ri-close-line"></i> Remove
+                    <i class="ri-close-line"></i> {t.wishlist.remove}
                 </button>
             {/if}
         </div>

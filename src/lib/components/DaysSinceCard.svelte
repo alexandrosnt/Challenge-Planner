@@ -1,5 +1,6 @@
 <script>
     import GlassCard from '$lib/components/GlassCard.svelte';
+    import { t } from '$lib/i18n/index.svelte';
 
     let { category, lastPurchaseDate } = $props();
 
@@ -27,10 +28,10 @@
                 <div class="days-count" class:green={colorClass === 'green'} class:yellow={colorClass === 'yellow'} class:pink={colorClass === 'pink'}>
                     {daysSince}
                 </div>
-                <div class="days-label">days since</div>
+                <div class="days-label">{t.daysSince.daysSince}</div>
             {:else}
                 <div class="days-count none">--</div>
-                <div class="days-label">no purchases</div>
+                <div class="days-label">{t.daysSince.noPurchases}</div>
             {/if}
             <div class="days-category">{category.name}</div>
         </div>

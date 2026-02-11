@@ -1,5 +1,6 @@
 <script>
     import GlassCard from '$lib/components/GlassCard.svelte';
+    import { t } from '$lib/i18n/index.svelte';
 
     let { emptyItems = 0, monthlySaved = 0, noBuyDays = 0 } = $props();
 </script>
@@ -8,17 +9,17 @@
     <div class="hero-stats">
         <div class="stat-item">
             <h3>{emptyItems}</h3>
-            <p>Used Up</p>
+            <p>{t.hero.usedUp}</p>
         </div>
         <div class="divider"></div>
         <div class="stat-item">
             <h3>{monthlySaved}€</h3>
-            <p>Saved</p>
+            <p>{t.hero.saved}</p>
         </div>
         <div class="divider"></div>
         <div class="stat-item">
             <h3 class="sage">{noBuyDays}</h3>
-            <p>No-Buy Days</p>
+            <p>{t.hero.noBuyDays}</p>
         </div>
     </div>
 </GlassCard>

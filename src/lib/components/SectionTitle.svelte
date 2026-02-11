@@ -1,5 +1,7 @@
 <script>
-    let { title, actionText = 'See All', onAction = undefined } = $props();
+    import { t } from '$lib/i18n/index.svelte';
+
+    let { title, actionText = t.common.seeAll, onAction = undefined } = $props();
 </script>
 
 <div class="section-title">

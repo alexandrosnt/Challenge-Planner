@@ -6,6 +6,7 @@
 	/** @typedef {import('$lib/db/queries').Item} Item */
 	/** @typedef {import('$lib/db/queries').UsageLogEntry} UsageLogEntry */
 	import { onMount } from 'svelte';
+	import { t } from '$lib/i18n/index.svelte';
 
 	let auth = getAuthState();
 
@@ -132,11 +133,11 @@
 							class:status-decluttered={displayItem.status === 'decluttered'}
 						>
 							{#if displayItem.status === 'active'}
-								Active
+								{t.common.active}
 							{:else if displayItem.status === 'used_up'}
-								Finished
+								{t.common.finished}
 							{:else}
-								Decluttered
+								{t.common.decluttered}
 							{/if}
 						</span>
 					</div>
@@ -149,18 +150,18 @@
 				<div class="stats-row">
 					<div class="stat-block">
 						<span class="stat-value">{formatCurrency(costPerUse)}</span>
-						<span class="stat-label">Cost / Use</span>
+						<span class="stat-label">{t.itemDetail.costPerUse}</span>
 					</div>
 					<div class="stat-block">
 						<span class="stat-value">{displayItem.usage_count ?? 0}</span>
-						<span class="stat-label">Total Uses</span>
+						<span class="stat-label">{t.itemDetail.totalUses}</span>
 					</div>
 					<div class="stat-block">
-						<span class="stat-value category-label">{displayItem.category_name ?? 'N/A'}</span>
+						<span class="stat-value category-label">{displayItem.category_name ?? t.itemDetail.na}</span>
 						{#if displayItem.subcategory_name}
 							<span class="stat-label">{displayItem.subcategory_name}</span>
 						{:else}
-							<span class="stat-label">Category</span>
+							<span class="stat-label">{t.common.category}</span>
 						{/if}
 					</div>
 				</div>
@@ -169,14 +170,14 @@
 				{#if displayItem.status === 'active'}
 					<button class="log-usage-btn" onclick={handleLogUsage} disabled={loading}>
 						<i class="ri-add-circle-line"></i>
-						{loading ? 'Logging...' : 'Log Usage'}
+						{loading ? t.itemDetail.logging : t.itemDetail.logUsage}
 					</button>
 				{/if}
 
 				<!-- Usage Log -->
-				<div class="section-title">Usage History</div>
+				<div class="section-title">{t.itemDetail.usageHistory}</div>
 				{#if usageLog.length === 0}
-					<p class="empty-text">No usage logged yet.</p>
+					<p class="empty-text">{t.itemDetail.noUsageYet}</p>
 				{:else}
 					<div class="usage-list">
 						{#each usageLog as entry (entry.id)}
@@ -196,31 +197,31 @@
 				<!-- Declutter Section (active items only) -->
 				{#if displayItem.status === 'active'}
 					<div class="declutter-section">
-						<div class="section-title">Declutter This Item</div>
+						<div class="section-title">{t.itemDetail.declutterThisItem}</div>
 
 						<div class="form-group">
-							<label for="declutter-reason">Reason</label>
+							<label for="declutter-reason">{t.itemDetail.reason}</label>
 							<textarea
 								id="declutter-reason"
 								bind:value={reason}
 								rows="3"
-								placeholder="Why are you letting this go?"
+								placeholder={t.itemDetail.whyLettingGo}
 							></textarea>
 						</div>
 
 						<div class="form-group">
-							<label for="declutter-method">Method</label>
+							<label for="declutter-method">{t.itemDetail.method}</label>
 							<select id="declutter-method" bind:value={method}>
-								<option value="donated">Donated</option>
-								<option value="sold">Sold</option>
-								<option value="trashed">Trashed</option>
-								<option value="gifted">Gifted</option>
+								<option value="donated">{t.itemDetail.donated}</option>
+								<option value="sold">{t.itemDetail.sold}</option>
+								<option value="trashed">{t.itemDetail.trashed}</option>
+								<option value="gifted">{t.itemDetail.gifted}</option>
 							</select>
 						</div>
 
 						{#if method === 'sold'}
 							<div class="form-group">
-								<label for="declutter-amount">Amount Recovered</label>
+								<label for="declutter-amount">{t.itemDetail.amountRecovered}</label>
 								<input
 									id="declutter-amount"
 									type="number"
@@ -233,7 +234,7 @@
 						{/if}
 
 						<button class="declutter-btn" onclick={handleDeclutter} disabled={loading}>
-							{loading ? 'Processing...' : 'Declutter Item'}
+							{loading ? t.itemDetail.processing : t.itemDetail.declutterItem}
 						</button>
 					</div>
 				{/if}

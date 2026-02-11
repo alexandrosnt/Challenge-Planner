@@ -1,5 +1,6 @@
 <script>
 	import { dragscroll } from '$lib/actions/dragscroll';
+	import { t } from '$lib/i18n/index.svelte';
 	let { subcategories, selected = 0, onSelect } = $props();
 </script>
 
@@ -9,7 +10,7 @@
 		class:active={selected === 0}
 		onclick={() => onSelect(0)}
 	>
-		<span>All</span>
+		<span>{t.common.all}</span>
 	</button>
 	{#each subcategories as sub (sub.id)}
 		<button

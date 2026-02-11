@@ -13,16 +13,17 @@
     import { openAddModal } from '$lib/stores/modal.svelte';
     import { getAuthState } from '$lib/stores/auth.svelte';
     import { dragscroll } from '$lib/actions/dragscroll';
+    import { t } from '$lib/i18n/index.svelte';
 
     let auth = getAuthState();
 
     function getTimeGreeting() {
         const hour = new Date().getHours();
-        if (hour < 5) return 'Good Night';
-        if (hour < 12) return 'Good Morning';
-        if (hour < 17) return 'Good Afternoon';
-        if (hour < 21) return 'Good Evening';
-        return 'Good Night';
+        if (hour < 5) return t.home.goodNight;
+        if (hour < 12) return t.home.goodMorning;
+        if (hour < 17) return t.home.goodAfternoon;
+        if (hour < 21) return t.home.goodEvening;
+        return t.home.goodNight;
     }
 
     let greeting = $derived(getTimeGreeting());
@@ -152,10 +153,10 @@
     });
 
     const quickActions = [
-        { icon: 'ri-add-circle-line', label: 'Add Item', action: () => openAddModal() },
-        { icon: 'ri-delete-bin-line', label: 'Declutter', action: () => goto('/declutter') },
-        { icon: 'ri-archive-drawer-line', label: 'Inventory', action: () => goto('/inventory') },
-        { icon: 'ri-line-chart-line', label: 'Insights', action: () => goto('/insights') },
+        { icon: 'ri-add-circle-line', label: t.home.addItem, action: () => openAddModal() },
+        { icon: 'ri-delete-bin-line', label: t.home.declutter, action: () => goto('/declutter') },
+        { icon: 'ri-archive-drawer-line', label: t.home.inventory, action: () => goto('/inventory') },
+        { icon: 'ri-line-chart-line', label: t.home.insights, action: () => goto('/insights') },
     ];
 
     /** @param {import('$lib/db/queries').Challenge} challenge */
@@ -226,8 +227,8 @@
                 <div class="progress-card-inner">
                     <ProgressRing value={completionPct} size={48} strokeWidth={4} />
                     <div class="progress-card-text">
-                        <span class="progress-card-title">My Progress</span>
-                        <span class="progress-card-sub">{stats.used_up_items} products finished</span>
+                        <span class="progress-card-title">{t.home.myProgress}</span>
+                        <span class="progress-card-sub">{stats.used_up_items} {t.home.productsFinished}</span>
                     </div>
                     <i class="ri-arrow-right-s-line progress-card-arrow"></i>
                 </div>
@@ -248,19 +249,19 @@
     </div>
 
     <!-- Categories with Counts -->
-    <SectionTitle title="Categories" actionText="View All" onAction={() => goto('/inventory')} />
+    <SectionTitle title={t.home.categories} actionText={t.common.viewAll} onAction={() => goto('/inventory')} />
     <CategoryPills {categories} itemCounts={itemCounts} />
 
     <!-- Active Streaks Highlight -->
     {#if activeStreaks.length > 0}
-        <SectionTitle title="Active Streaks" actionText="View All" onAction={() => goto('/projects')} />
+        <SectionTitle title={t.home.activeStreaks} actionText={t.common.viewAll} onAction={() => goto('/projects')} />
         <div class="streaks-compact" use:dragscroll>
             {#each activeStreaks as streak (streak.id)}
                 <GlassCard style="padding: 14px;">
                     <div class="streak-mini">
                         <i class="ri-fire-line" style="color: var(--accent-pink);"></i>
                         <span class="streak-num">{streak.current_count}</span>
-                        <span class="streak-cat">{streak.category_name || 'All'}</span>
+                        <span class="streak-cat">{streak.category_name || t.common.all}</span>
                     </div>
                 </GlassCard>
             {/each}
@@ -269,7 +270,7 @@
 
     <!-- Top Challenges -->
     {#if activeChallenges.length > 0}
-        <SectionTitle title="Current Focus" actionText="View All" onAction={() => goto('/projects')} />
+        <SectionTitle title={t.home.currentFocus} actionText={t.common.viewAll} onAction={() => goto('/projects')} />
         {#each activeChallenges as challenge (challenge.id)}
             <ChallengeCard
                 title={challenge.title}
@@ -294,7 +295,7 @@
 
     <!-- Wishlist Ready Items -->
     {#if readyWishlist.length > 0}
-        <SectionTitle title="Wishlist Ready" actionText="{readyWishlist.length} ready" />
+        <SectionTitle title={t.home.wishlistReady} actionText="{readyWishlist.length} {t.home.ready}" />
         {#each readyWishlist as item (item.id)}
             <WishlistCard
                 {item}
@@ -306,7 +307,7 @@
 
     <!-- Recent Activity -->
     {#if activity.length > 0}
-        <SectionTitle title="Recent Activity" actionText="" />
+        <SectionTitle title={t.home.recentActivity} actionText="" />
         <ActivityFeed entries={activity} />
     {/if}
 </main>

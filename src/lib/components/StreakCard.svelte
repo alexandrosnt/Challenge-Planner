@@ -1,5 +1,6 @@
 <script>
     import GlassCard from '$lib/components/GlassCard.svelte';
+    import { t } from '$lib/i18n/index.svelte';
 
     let { streak } = $props();
 </script>
@@ -11,10 +12,10 @@
                 <i class="ri-fire-line"></i>
             </div>
             <div class="streak-count">{streak.current_count}</div>
-            <div class="streak-label">days</div>
-            <div class="streak-category">{streak.category_name || 'All Categories'}</div>
+            <div class="streak-label">{t.streak.days}</div>
+            <div class="streak-category">{streak.category_name || t.streak.allCategories}</div>
             {#if streak.best_count > streak.current_count}
-                <div class="streak-best">Best: {streak.best_count}</div>
+                <div class="streak-best">{t.streak.best}: {streak.best_count}</div>
             {/if}
         </div>
     </GlassCard>

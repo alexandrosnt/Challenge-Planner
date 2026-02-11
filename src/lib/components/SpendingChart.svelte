@@ -1,5 +1,6 @@
 <script>
     import GlassCard from '$lib/components/GlassCard.svelte';
+    import { t } from '$lib/i18n/index.svelte';
 
     let { budgets = [] } = $props();
 
@@ -14,7 +15,7 @@
 </script>
 
 <GlassCard>
-    <h3 class="chart-title">Spending by Category</h3>
+    <h3 class="chart-title">{t.spending.title}</h3>
     {#if budgets.length > 0}
         <div class="chart">
             {#each budgets as budget (budget.id)}
@@ -33,11 +34,11 @@
             {/each}
         </div>
         <div class="legend">
-            <span class="legend-item"><span class="legend-bar"></span> Spent</span>
-            <span class="legend-item"><span class="legend-line"></span> Limit</span>
+            <span class="legend-item"><span class="legend-bar"></span> {t.spending.spent}</span>
+            <span class="legend-item"><span class="legend-line"></span> {t.spending.limit}</span>
         </div>
     {:else}
-        <p class="empty-text">No budgets set yet.</p>
+        <p class="empty-text">{t.spending.emptyState}</p>
     {/if}
 </GlassCard>
 

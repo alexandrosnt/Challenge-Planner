@@ -5,6 +5,7 @@
     import { loadDeclutterPageData, logDeclutter, checkAchievements, type DeclutterPageData, type DeclutterCandidate } from '$lib/db/queries';
     import { getAuthState } from '$lib/stores/auth.svelte';
     import { goto } from '$app/navigation';
+    import { t } from '$lib/i18n/index.svelte';
 
     let auth = getAuthState();
 
@@ -80,7 +81,7 @@
     <button class="back-btn" aria-label="Go back" onclick={() => goto('/')}>
         <i class="ri-arrow-left-s-line"></i>
     </button>
-    <h1 class="page-title">Declutter</h1>
+    <h1 class="page-title">{t.declutter.title}</h1>
     <div class="header-spacer"></div>
 </header>
 
@@ -92,34 +93,34 @@
                 <div class="mini-stat">
                     <i class="ri-heart-line mini-stat-icon donated"></i>
                     <span class="mini-stat-value">{data.stats.donated}</span>
-                    <span class="mini-stat-label">Donated</span>
+                    <span class="mini-stat-label">{t.declutter.donated}</span>
                 </div>
                 <div class="mini-stat">
                     <i class="ri-money-dollar-circle-line mini-stat-icon sold"></i>
                     <span class="mini-stat-value">{data.stats.sold}</span>
-                    <span class="mini-stat-label">Sold</span>
+                    <span class="mini-stat-label">{t.declutter.sold}</span>
                 </div>
                 <div class="mini-stat">
                     <i class="ri-gift-line mini-stat-icon gifted"></i>
                     <span class="mini-stat-value">{data.stats.gifted}</span>
-                    <span class="mini-stat-label">Gifted</span>
+                    <span class="mini-stat-label">{t.declutter.gifted}</span>
                 </div>
                 <div class="mini-stat">
                     <i class="ri-delete-bin-line mini-stat-icon trashed"></i>
                     <span class="mini-stat-value">{data.stats.trashed}</span>
-                    <span class="mini-stat-label">Trashed</span>
+                    <span class="mini-stat-label">{t.declutter.trashed}</span>
                 </div>
             </div>
             {#if data.stats.total_recovered > 0}
                 <div class="recovered-banner">
                     <i class="ri-coins-line"></i>
-                    <span>{data.stats.total_recovered.toFixed(2)}&euro; recovered from sold items</span>
+                    <span>{data.stats.total_recovered.toFixed(2)}&euro; {t.declutter.recoveredFromSold}</span>
                 </div>
             {/if}
         </GlassCard>
 
         <!-- Active Items to Declutter -->
-        <SectionTitle title="Ready to Let Go" actionText="{data.candidates.length} items" />
+        <SectionTitle title={t.declutter.readyToLetGo} actionText="{data.candidates.length} {t.common.items}" />
 
         {#if data.candidates.length > 0}
             <div class="candidates-grid">
@@ -169,7 +170,7 @@
             <GlassCard>
                 <div class="empty-state">
                     <i class="ri-checkbox-circle-line empty-icon"></i>
-                    <p class="empty-text">All items are in use or already decluttered!</p>
+                    <p class="empty-text">{t.declutter.emptyState}</p>
                 </div>
             </GlassCard>
         {/if}
@@ -184,13 +185,13 @@
                             <span class="confirm-item-name">{selectedItem.name}</span>
                             <span class="confirm-method">
                                 {#if method === 'donated'}
-                                    <i class="ri-heart-line"></i> Donate
+                                    <i class="ri-heart-line"></i> {t.declutter.donate}
                                 {:else if method === 'sold'}
-                                    <i class="ri-money-dollar-circle-line"></i> Sell
+                                    <i class="ri-money-dollar-circle-line"></i> {t.declutter.sell}
                                 {:else if method === 'gifted'}
-                                    <i class="ri-gift-line"></i> Gift
+                                    <i class="ri-gift-line"></i> {t.declutter.gift}
                                 {:else}
-                                    <i class="ri-delete-bin-line"></i> Trash
+                                    <i class="ri-delete-bin-line"></i> {t.declutter.trash}
                                 {/if}
                             </span>
                         </div>
@@ -198,7 +199,7 @@
 
                     <textarea
                         class="reason-input"
-                        placeholder="Reason (optional)"
+                        placeholder={t.declutter.reasonPlaceholder}
                         bind:value={reason}
                         rows="2"
                     ></textarea>
@@ -209,7 +210,7 @@
                             <input
                                 type="number"
                                 class="amount-input"
-                                placeholder="Amount recovered"
+                                placeholder={t.declutter.amountRecovered}
                                 bind:value={amountRecovered}
                                 min="0"
                                 step="0.01"
@@ -219,13 +220,13 @@
 
                     <div class="confirm-actions">
                         <button class="btn-cancel" onclick={cancelSelection} disabled={processing}>
-                            Cancel
+                            {t.common.cancel}
                         </button>
                         <button class="btn-confirm" onclick={confirmDeclutter} disabled={processing}>
                             {#if processing}
-                                <i class="ri-loader-4-line spin"></i> Processing...
+                                <i class="ri-loader-4-line spin"></i> {t.declutter.processing}
                             {:else}
-                                Confirm
+                                {t.common.confirm}
                             {/if}
                         </button>
                     </div>
@@ -235,13 +236,13 @@
 
         <!-- Already Decluttered -->
         {#if data.decluttered.length > 0}
-            <SectionTitle title="Already Decluttered" actionText="{data.decluttered.length} total" />
+            <SectionTitle title={t.declutter.alreadyDecluttered} actionText="{data.decluttered.length} {t.common.total}" />
 
             {#if donatedItems.length > 0}
                 <div class="decluttered-section">
                     <div class="decluttered-section-header">
                         <i class="ri-heart-line section-icon donated"></i>
-                        <span class="section-label">Donated</span>
+                        <span class="section-label">{t.declutter.donated}</span>
                         <span class="section-count">{donatedItems.length}</span>
                     </div>
                     <GlassCard>
@@ -262,7 +263,7 @@
                 <div class="decluttered-section">
                     <div class="decluttered-section-header">
                         <i class="ri-money-dollar-circle-line section-icon sold"></i>
-                        <span class="section-label">Sold</span>
+                        <span class="section-label">{t.declutter.sold}</span>
                         <span class="section-count">{soldItems.length}</span>
                     </div>
                     <GlassCard>
@@ -286,7 +287,7 @@
                 <div class="decluttered-section">
                     <div class="decluttered-section-header">
                         <i class="ri-gift-line section-icon gifted"></i>
-                        <span class="section-label">Gifted</span>
+                        <span class="section-label">{t.declutter.gifted}</span>
                         <span class="section-count">{giftedItems.length}</span>
                     </div>
                     <GlassCard>
@@ -307,7 +308,7 @@
                 <div class="decluttered-section">
                     <div class="decluttered-section-header">
                         <i class="ri-delete-bin-line section-icon trashed"></i>
-                        <span class="section-label">Trashed</span>
+                        <span class="section-label">{t.declutter.trashed}</span>
                         <span class="section-count">{trashedItems.length}</span>
                     </div>
                     <GlassCard>

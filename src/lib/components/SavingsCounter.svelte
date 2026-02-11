@@ -1,5 +1,6 @@
 <script>
     import GlassCard from '$lib/components/GlassCard.svelte';
+    import { t } from '$lib/i18n/index.svelte';
     import { onMount } from 'svelte';
 
     let { totalSaved = 0 } = $props();
@@ -32,7 +33,7 @@
             <i class="ri-leaf-line"></i>
         </div>
         <div class="savings-amount">{displayValue.toFixed(2)}€</div>
-        <div class="savings-label">Total Saved</div>
+        <div class="savings-label">{t.savings.totalSaved}</div>
     </div>
 </GlassCard>
 

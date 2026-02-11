@@ -3,19 +3,24 @@
 	import BottomDock from '$lib/components/BottomDock.svelte';
 	import AddModal from '$lib/components/AddModal.svelte';
 	import LoginForm from '$lib/components/LoginForm.svelte';
+	import LanguageWelcome from '$lib/components/LanguageWelcome.svelte';
 	import { initDb } from '$lib/db/client';
 	import { initializeDatabase } from '$lib/db/queries';
 	import { startSync } from '$lib/db/sync';
 	import { checkSession, getAuthState } from '$lib/stores/auth.svelte';
 	import { onMount } from 'svelte';
+	import { t, initLocale } from '$lib/i18n/index.svelte';
 
 	let { children } = $props();
 
 	let auth = getAuthState();
 	let dbReady = $state(false);
 	let dbError = $state('');
+	let languageChosen = $state(false);
 
 	onMount(async () => {
+		languageChosen = initLocale();
+
 		try {
 			await initDb();
 			await initializeDatabase();
@@ -33,7 +38,9 @@
 	});
 </script>
 
-{#if dbReady}
+{#if !languageChosen}
+	<LanguageWelcome onSelect={() => languageChosen = true} />
+{:else if dbReady}
 	{#if auth.isAuthenticated}
 		{@render children()}
 		<BottomDock />
@@ -44,16 +51,16 @@
 		</main>
 	{:else}
 		<div style="display: flex; align-items: center; justify-content: center; height: 100vh;">
-			<p>Loading...</p>
+			<p>{t.common.loading}</p>
 		</div>
 	{/if}
 {:else if dbError}
 	<div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; padding: 24px; text-align: center;">
-		<p style="color: var(--accent-pink); font-weight: 600; margin-bottom: 8px;">Failed to connect</p>
+		<p style="color: var(--accent-pink); font-weight: 600; margin-bottom: 8px;">{t.layout.failedToConnect}</p>
 		<p style="font-size: 12px; color: var(--text-soft); word-break: break-all;">{dbError}</p>
 	</div>
 {:else}
 	<div style="display: flex; align-items: center; justify-content: center; height: 100vh;">
-		<p>Loading...</p>
+		<p>{t.common.loading}</p>
 	</div>
 {/if}

@@ -3,6 +3,7 @@
 	import { dragscroll } from '$lib/actions/dragscroll';
 	import { getModalState, closeAddModal } from '$lib/stores/modal.svelte';
 	import { getAuthState } from '$lib/stores/auth.svelte';
+	import { t } from '$lib/i18n/index.svelte';
 	import {
 		getCategories,
 		getSubcategories,
@@ -27,11 +28,11 @@
 	let submitting = $state(false);
 
 	const tabs = [
-		{ key: 'item', label: 'Item' },
-		{ key: 'purchase', label: 'Purchase' },
-		{ key: 'challenge', label: 'Challenge' },
-		{ key: 'budget', label: 'Budget' },
-		{ key: 'wishlist', label: 'Wishlist' }
+		{ key: 'item', label: t.addModal.item },
+		{ key: 'purchase', label: t.addModal.purchase },
+		{ key: 'challenge', label: t.addModal.challenge },
+		{ key: 'budget', label: t.addModal.budget },
+		{ key: 'wishlist', label: t.addModal.wishlist }
 	];
 
 	// Item form state
@@ -279,13 +280,13 @@
 				{#if activeTab === 'item'}
 					<form onsubmit={(e) => { e.preventDefault(); submitItem(); }}>
 						<div class="form-group">
-							<label for="item-name">Name</label>
-							<input id="item-name" type="text" bind:value={itemName} placeholder="Product name" required />
+							<label for="item-name">{t.common.name}</label>
+							<input id="item-name" type="text" bind:value={itemName} placeholder={t.addModal.productName} required />
 						</div>
 						<div class="form-group">
-							<label for="item-category">Category</label>
+							<label for="item-category">{t.common.category}</label>
 							<select id="item-category" bind:value={itemCategory} required>
-								<option value={0} disabled>Select category</option>
+								<option value={0} disabled>{t.addModal.selectCategory}</option>
 								{#each categories as cat (cat.id)}
 									<option value={cat.id}>{cat.name}</option>
 								{/each}
@@ -293,9 +294,9 @@
 						</div>
 						{#if subcategories.length > 0}
 							<div class="form-group">
-								<label for="item-subcategory">Subcategory</label>
+								<label for="item-subcategory">{t.addModal.subcategory}</label>
 								<select id="item-subcategory" bind:value={itemSubcategory}>
-									<option value={0}>None</option>
+									<option value={0}>{t.common.none}</option>
 									{#each subcategories as sub (sub.id)}
 										<option value={sub.id}>{sub.name}</option>
 									{/each}
@@ -304,41 +305,41 @@
 						{/if}
 						<div class="form-row">
 							<div class="form-group">
-								<label for="item-price">Purchase Price</label>
+								<label for="item-price">{t.addModal.purchasePrice}</label>
 								<input id="item-price" type="number" step="0.01" min="0" bind:value={itemPrice} placeholder="0.00" />
 							</div>
 							<div class="form-group">
-								<label for="item-quantity">Quantity</label>
+								<label for="item-quantity">{t.addModal.quantity}</label>
 								<input id="item-quantity" type="number" min="1" bind:value={itemQuantity} />
 							</div>
 						</div>
 						<div class="form-group">
-							<label for="item-date">Purchase Date</label>
+							<label for="item-date">{t.addModal.purchaseDate}</label>
 							<input id="item-date" type="date" bind:value={itemDate} />
 						</div>
 						<div class="form-group">
-							<label for="item-notes">Notes</label>
-							<textarea id="item-notes" bind:value={itemNotes} rows="3" placeholder="Optional notes..."></textarea>
+							<label for="item-notes">{t.common.notes}</label>
+							<textarea id="item-notes" bind:value={itemNotes} rows="3" placeholder={t.addModal.optionalNotes}></textarea>
 						</div>
 						<button type="submit" class="submit-btn" disabled={submitting}>
-							{submitting ? 'Adding...' : 'Add Item'}
+							{submitting ? t.addModal.adding : t.addModal.addItem}
 						</button>
 					</form>
 
 				{:else if activeTab === 'purchase'}
 					<form onsubmit={(e) => { e.preventDefault(); submitPurchase(); }}>
 						<div class="form-group">
-							<label for="purchase-name">Name</label>
-							<input id="purchase-name" type="text" bind:value={purchaseName} placeholder="What did you buy?" required />
+							<label for="purchase-name">{t.common.name}</label>
+							<input id="purchase-name" type="text" bind:value={purchaseName} placeholder={t.addModal.whatDidYouBuy} required />
 						</div>
 						<div class="form-group">
-							<label for="purchase-amount">Amount</label>
+							<label for="purchase-amount">{t.addModal.amount}</label>
 							<input id="purchase-amount" type="number" step="0.01" min="0" bind:value={purchaseAmount} placeholder="0.00" required />
 						</div>
 						<div class="form-group">
-							<label for="purchase-category">Category</label>
+							<label for="purchase-category">{t.common.category}</label>
 							<select id="purchase-category" bind:value={purchaseCategory} required>
-								<option value={0} disabled>Select category</option>
+								<option value={0} disabled>{t.addModal.selectCategory}</option>
 								{#each categories as cat (cat.id)}
 									<option value={cat.id}>{cat.name}</option>
 								{/each}
@@ -346,9 +347,9 @@
 						</div>
 						{#if subcategories.length > 0}
 							<div class="form-group">
-								<label for="purchase-subcategory">Subcategory</label>
+								<label for="purchase-subcategory">{t.addModal.subcategory}</label>
 								<select id="purchase-subcategory" bind:value={purchaseSubcategory}>
-									<option value={0}>None</option>
+									<option value={0}>{t.common.none}</option>
 									{#each subcategories as sub (sub.id)}
 										<option value={sub.id}>{sub.name}</option>
 									{/each}
@@ -356,108 +357,108 @@
 							</div>
 						{/if}
 						<div class="form-group">
-							<label for="purchase-date">Purchase Date</label>
+							<label for="purchase-date">{t.addModal.purchaseDate}</label>
 							<input id="purchase-date" type="date" bind:value={purchaseDate} />
 						</div>
 						<div class="form-group">
-							<label for="purchase-notes">Notes</label>
-							<textarea id="purchase-notes" bind:value={purchaseNotes} rows="3" placeholder="Optional notes..."></textarea>
+							<label for="purchase-notes">{t.common.notes}</label>
+							<textarea id="purchase-notes" bind:value={purchaseNotes} rows="3" placeholder={t.addModal.optionalNotes}></textarea>
 						</div>
 						<input type="hidden" bind:value={purchaseFeeling} />
 						<button type="submit" class="submit-btn" disabled={submitting}>
-							{submitting ? 'Adding...' : 'Add Purchase'}
+							{submitting ? t.addModal.adding : t.addModal.addPurchase}
 						</button>
 					</form>
 
 				{:else if activeTab === 'challenge'}
 					<form onsubmit={(e) => { e.preventDefault(); submitChallenge(); }}>
 						<div class="form-group">
-							<label for="challenge-title">Title</label>
-							<input id="challenge-title" type="text" bind:value={challengeTitle} placeholder="Challenge name" required />
+							<label for="challenge-title">{t.addModal.challengeTitle}</label>
+							<input id="challenge-title" type="text" bind:value={challengeTitle} placeholder={t.addModal.challengeName} required />
 						</div>
 						<div class="form-row">
 							<div class="form-group">
-								<label for="challenge-target">Target Count</label>
+								<label for="challenge-target">{t.addModal.targetCount}</label>
 								<input id="challenge-target" type="number" min="1" bind:value={challengeTarget} placeholder="10" required />
 							</div>
 							<div class="form-group">
-								<label for="challenge-icon">Icon</label>
+								<label for="challenge-icon">{t.addModal.icon}</label>
 								<input id="challenge-icon" type="text" bind:value={challengeIcon} placeholder="ri-trophy-line" />
 							</div>
 						</div>
 						<div class="form-group">
-							<label for="challenge-deadline">Deadline</label>
+							<label for="challenge-deadline">{t.addModal.deadline}</label>
 							<input id="challenge-deadline" type="date" bind:value={challengeDeadline} />
 						</div>
 						<div class="form-group">
-							<label for="challenge-category">Category (Optional)</label>
+							<label for="challenge-category">{t.addModal.categoryOptional}</label>
 							<select id="challenge-category" bind:value={challengeCategory}>
-								<option value={0}>None</option>
+								<option value={0}>{t.common.none}</option>
 								{#each categories as cat (cat.id)}
 									<option value={cat.id}>{cat.name}</option>
 								{/each}
 							</select>
 						</div>
 						<button type="submit" class="submit-btn" disabled={submitting}>
-							{submitting ? 'Adding...' : 'Add Challenge'}
+							{submitting ? t.addModal.adding : t.addModal.addChallenge}
 						</button>
 					</form>
 
 				{:else if activeTab === 'budget'}
 					<form onsubmit={(e) => { e.preventDefault(); submitBudget(); }}>
 						<div class="form-group">
-							<label for="budget-category">Category</label>
+							<label for="budget-category">{t.common.category}</label>
 							<select id="budget-category" bind:value={budgetCategory} required>
-								<option value={0} disabled>Select category</option>
+								<option value={0} disabled>{t.addModal.selectCategory}</option>
 								{#each categories as cat (cat.id)}
 									<option value={cat.id}>{cat.name}</option>
 								{/each}
 							</select>
 						</div>
 						<div class="form-group">
-							<label for="budget-limit">Monthly Limit</label>
+							<label for="budget-limit">{t.addModal.monthlyLimit}</label>
 							<input id="budget-limit" type="number" step="0.01" min="0" bind:value={budgetLimit} placeholder="0.00" required />
 						</div>
 						<div class="form-group">
-							<label for="budget-month">Month</label>
+							<label for="budget-month">{t.addModal.month}</label>
 							<input id="budget-month" type="month" bind:value={budgetMonth} />
 						</div>
 						<div class="form-group checkbox-group">
 							<label for="budget-carryover">
 								<input id="budget-carryover" type="checkbox" bind:checked={budgetCarryover} />
-								<span>Carry over unused budget to next month</span>
+								<span>{t.addModal.carryOver}</span>
 							</label>
 						</div>
 						<button type="submit" class="submit-btn" disabled={submitting}>
-							{submitting ? 'Adding...' : 'Add Budget'}
+							{submitting ? t.addModal.adding : t.addModal.addBudget}
 						</button>
 					</form>
 
 				{:else if activeTab === 'wishlist'}
 					<form onsubmit={(e) => { e.preventDefault(); submitWishlist(); }}>
 						<div class="form-group">
-							<label for="wishlist-name">Name</label>
-							<input id="wishlist-name" type="text" bind:value={wishlistName} placeholder="What do you want?" required />
+							<label for="wishlist-name">{t.common.name}</label>
+							<input id="wishlist-name" type="text" bind:value={wishlistName} placeholder={t.addModal.whatDoYouWant} required />
 						</div>
 						<div class="form-group">
-							<label for="wishlist-category">Category (Optional)</label>
+							<label for="wishlist-category">{t.addModal.categoryOptional}</label>
 							<select id="wishlist-category" bind:value={wishlistCategory}>
-								<option value={0}>None</option>
+								<option value={0}>{t.common.none}</option>
 								{#each categories as cat (cat.id)}
 									<option value={cat.id}>{cat.name}</option>
 								{/each}
 							</select>
 						</div>
 						<div class="form-group">
-							<label for="wishlist-price">Estimated Price</label>
+							<label for="wishlist-price">{t.addModal.estimatedPrice}</label>
 							<input id="wishlist-price" type="number" step="0.01" min="0" bind:value={wishlistPrice} placeholder="0.00" />
 						</div>
 						<div class="form-group">
-							<label for="wishlist-notes">Notes</label>
-							<textarea id="wishlist-notes" bind:value={wishlistNotes} rows="3" placeholder="Why do you want this?"></textarea>
+							<label for="wishlist-notes">{t.common.notes}</label>
+							<textarea id="wishlist-notes" bind:value={wishlistNotes} rows="3" placeholder={t.addModal.whyDoYouWant}></textarea>
 						</div>
 						<button type="submit" class="submit-btn" disabled={submitting}>
-							{submitting ? 'Adding...' : 'Add to Wishlist'}
+							{submitting ? t.addModal.adding : t.addModal.addToWishlist}
 						</button>
 					</form>
 				{/if}

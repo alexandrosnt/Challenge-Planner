@@ -14,6 +14,7 @@
     } from '$lib/db/queries';
     import { getAuthState } from '$lib/stores/auth.svelte';
     import { dragscroll } from '$lib/actions/dragscroll';
+    import { t } from '$lib/i18n/index.svelte';
 
     let auth = getAuthState();
 
@@ -65,8 +66,8 @@
 
 <header style="padding: 20px 24px;">
     <div>
-        <p style="font-size: 14px; color: var(--text-soft); font-weight: 500;">Your Goals</p>
-        <h1 style="font-size: 26px; font-weight: 700; letter-spacing: -0.5px;">Projects</h1>
+        <p style="font-size: 14px; color: var(--text-soft); font-weight: 500;">{t.projects.yourGoals}</p>
+        <h1 style="font-size: 26px; font-weight: 700; letter-spacing: -0.5px;">{t.projects.title}</h1>
     </div>
 </header>
 
@@ -99,7 +100,7 @@
     {:else}
     <!-- Active Challenges -->
     {#if activeChallenges.length > 0}
-        <SectionTitle title="Active Challenges" actionText="{activeChallenges.length} active" />
+        <SectionTitle title={t.projects.activeChallenges} actionText="{activeChallenges.length} {t.common.active}" />
         {#each activeChallenges as challenge (challenge.id)}
             <ChallengeCard
                 title={challenge.title}
@@ -115,7 +116,7 @@
 
     <!-- No-Buy Streaks -->
     {#if activeStreaks.length > 0}
-        <SectionTitle title="No-Buy Streaks" actionText="{activeStreaks.length} active" />
+        <SectionTitle title={t.projects.noBuyStreaks} actionText="{activeStreaks.length} {t.common.active}" />
         <div class="streaks-scroll" use:dragscroll>
             {#each activeStreaks as streak (streak.id)}
                 <StreakCard {streak} />
@@ -124,7 +125,7 @@
     {/if}
 
     <!-- Achievements -->
-    <SectionTitle title="Achievements" actionText="{unlockedCount}/{achievements.length}" />
+    <SectionTitle title={t.projects.achievements} actionText="{unlockedCount}/{achievements.length}" />
     {#if achievements.length > 0}
         <div class="achievements-grid">
             {#each achievements as achievement (achievement.id)}
@@ -133,13 +134,13 @@
         </div>
     {:else}
         <div class="empty-hint">
-            <p>Complete challenges and build streaks to unlock achievements!</p>
+            <p>{t.projects.achievementsHint}</p>
         </div>
     {/if}
 
     <!-- Completed Challenges -->
     {#if completedChallenges.length > 0}
-        <SectionTitle title="Completed" actionText="{completedChallenges.length} done" />
+        <SectionTitle title={t.projects.completed} actionText="{completedChallenges.length} {t.common.done}" />
         {#each completedChallenges as challenge (challenge.id)}
             <ChallengeCard
                 title={challenge.title}
@@ -155,7 +156,7 @@
     {#if challenges.length === 0 && streaks.length === 0}
         <div class="empty-state">
             <i class="ri-trophy-line"></i>
-            <p>No projects yet. Create a challenge or start a no-buy streak!</p>
+            <p>{t.projects.emptyState}</p>
         </div>
     {/if}
     {/if}

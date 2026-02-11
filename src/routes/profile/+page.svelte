@@ -4,6 +4,7 @@
     import { getUserProfile, updateUserProfile, getItems, getChallenges, getComputedStats } from '$lib/db/queries';
     import { getAuthState, logout } from '$lib/stores/auth.svelte';
     import { onMount } from 'svelte';
+    import { t, getLocale, setLocale } from '$lib/i18n/index.svelte';
 
     let auth = getAuthState();
 
@@ -56,8 +57,8 @@
 
 <header style="padding: 20px 24px;">
     <div>
-        <p style="font-size: 14px; color: var(--text-soft); font-weight: 500;">Settings</p>
-        <h1 style="font-size: 26px; font-weight: 700; letter-spacing: -0.5px;">Profile</h1>
+        <p style="font-size: 14px; color: var(--text-soft); font-weight: 500;">{t.profile.settings}</p>
+        <h1 style="font-size: 26px; font-weight: 700; letter-spacing: -0.5px;">{t.profile.title}</h1>
     </div>
 </header>
 
@@ -70,7 +71,7 @@
             <div class="avatar">
                 <i class="ri-user-smile-line"></i>
             </div>
-            <h2 class="avatar-name">{name || 'User'}</h2>
+            <h2 class="avatar-name">{name || t.profile.user}</h2>
             {#if email}
                 <p class="avatar-email">{email}</p>
             {/if}
@@ -81,49 +82,60 @@
             <div class="profile-stats">
                 <div class="p-stat">
                     <h3>{totalItems}</h3>
-                    <p>Items</p>
+                    <p>{t.profile.items}</p>
                 </div>
                 <div class="p-stat">
                     <h3>{usedUpItems}</h3>
-                    <p>Used Up</p>
+                    <p>{t.profile.usedUp}</p>
                 </div>
                 <div class="p-stat">
                     <h3>{totalChallenges}</h3>
-                    <p>Challenges</p>
+                    <p>{t.profile.challenges}</p>
                 </div>
             </div>
         </GlassCard>
 
         <!-- Edit Profile -->
         <GlassCard>
-            <h3 class="card-title">Edit Profile</h3>
+            <h3 class="card-title">{t.profile.editProfile}</h3>
             <div class="form-group">
-                <label for="p-name">Display Name</label>
-                <input id="p-name" type="text" bind:value={name} placeholder="Your name" />
+                <label for="p-name">{t.profile.displayName}</label>
+                <input id="p-name" type="text" bind:value={name} placeholder={t.profile.yourName} />
             </div>
             <div class="form-group">
-                <label for="p-greeting">Greeting</label>
+                <label for="p-greeting">{t.profile.greeting}</label>
                 <select id="p-greeting" bind:value={greeting}>
-                    <option value="Good Morning">Good Morning</option>
-                    <option value="Hello">Hello</option>
-                    <option value="Hey">Hey</option>
-                    <option value="Welcome back">Welcome back</option>
+                    <option value="Good Morning">{t.profile.goodMorning}</option>
+                    <option value="Hello">{t.profile.hello}</option>
+                    <option value="Hey">{t.profile.hey}</option>
+                    <option value="Welcome back">{t.profile.welcomeBack}</option>
                 </select>
             </div>
             <button class="save-btn" onclick={handleSave} disabled={saving}>
                 {#if saved}
-                    Saved!
+                    {t.profile.saved}
                 {:else if saving}
-                    Saving...
+                    {t.profile.saving}
                 {:else}
-                    Save Changes
+                    {t.profile.saveChanges}
                 {/if}
             </button>
         </GlassCard>
 
+        <!-- Language -->
+        <GlassCard>
+            <h3 class="card-title">{t.profile.language}</h3>
+            <div class="form-group" style="margin-bottom: 0;">
+                <select value={getLocale()} onchange={(e) => setLocale(e.currentTarget.value)}>
+                    <option value="en">{t.profile.languageEnglish}</option>
+                    <option value="de">{t.profile.languageDeutsch}</option>
+                </select>
+            </div>
+        </GlassCard>
+
         <!-- Logout -->
         <button class="logout-btn" onclick={handleLogout}>
-            <i class="ri-logout-box-line"></i> Sign Out
+            <i class="ri-logout-box-line"></i> {t.profile.signOut}
         </button>
     {/if}
 
@@ -131,8 +143,8 @@
     <GlassCard>
         <div class="app-info">
             <i class="ri-heart-3-fill" style="color: var(--accent-pink);"></i>
-            <p>Use Up | Premium v1.0</p>
-            <p class="app-desc">Track your product usage, set budgets, and complete challenges.</p>
+            <p>{t.profile.appVersion}</p>
+            <p class="app-desc">{t.profile.appDesc}</p>
         </div>
     </GlassCard>
 </main>

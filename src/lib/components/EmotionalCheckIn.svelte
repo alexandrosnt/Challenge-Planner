@@ -1,12 +1,14 @@
 <script>
+    import { t } from '$lib/i18n/index.svelte';
+
     let { onSelect, onSkip } = $props();
 
     const feelings = [
-        { value: 'happy', emoji: '\u{1F60A}', label: 'Happy' },
-        { value: 'neutral', emoji: '\u{1F610}', label: 'Neutral' },
-        { value: 'guilty', emoji: '\u{1F614}', label: 'Guilty' },
-        { value: 'impulsive', emoji: '\u{1F525}', label: 'Impulsive' },
-        { value: 'needed', emoji: '\u{2705}', label: 'Needed' },
+        { value: 'happy', emoji: '\u{1F60A}', label: t.emotional.happy },
+        { value: 'neutral', emoji: '\u{1F610}', label: t.emotional.neutral },
+        { value: 'guilty', emoji: '\u{1F614}', label: t.emotional.guilty },
+        { value: 'impulsive', emoji: '\u{1F525}', label: t.emotional.impulsive },
+        { value: 'needed', emoji: '\u{2705}', label: t.emotional.needed },
     ];
 </script>
 
@@ -15,7 +17,7 @@
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <div class="checkin-backdrop" onclick={onSkip} role="presentation"></div>
     <div class="checkin-card">
-        <h3 class="checkin-title">How do you feel about this purchase?</h3>
+        <h3 class="checkin-title">{t.emotional.howDoYouFeel}</h3>
         <div class="feelings-row">
             {#each feelings as f (f.value)}
                 <button class="feeling-btn" onclick={() => onSelect(f.value)}>
@@ -24,7 +26,7 @@
                 </button>
             {/each}
         </div>
-        <button class="skip-btn" onclick={onSkip}>Skip</button>
+        <button class="skip-btn" onclick={onSkip}>{t.emotional.skip}</button>
     </div>
 </div>
 

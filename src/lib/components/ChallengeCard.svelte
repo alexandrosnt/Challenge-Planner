@@ -2,8 +2,9 @@
     import GlassCard from '$lib/components/GlassCard.svelte';
     import ProgressBar from '$lib/components/ProgressBar.svelte';
     import ProgressRing from '$lib/components/ProgressRing.svelte';
+    import { t } from '$lib/i18n/index.svelte';
 
-    let { title, icon, tag = 'Project Pan', completed, total, deadline = null, onIncrement = undefined } = $props();
+    let { title, icon, tag = t.challenge.projectPan, completed, total, deadline = null, onIncrement = undefined } = $props();
 
     let remaining = $derived(total - completed);
     let percentage = $derived(total > 0 ? Math.round((completed / total) * 100) : 0);
@@ -19,23 +20,23 @@
             <span class="tag">{tag}</span>
             <h3 class="project-title">{title}</h3>
             {#if deadline}
-                <p class="deadline">Deadline: {deadline}</p>
+                <p class="deadline">{t.challenge.deadline}: {deadline}</p>
             {/if}
         </div>
         <ProgressRing value={percentage} size={56} strokeWidth={4} />
     </div>
     <div class="progress-info">
-        <span>{completed} Used Up</span>
-        <span>{remaining} Remaining</span>
+        <span>{completed} {t.challenge.usedUp}</span>
+        <span>{remaining} {t.challenge.remaining}</span>
     </div>
     <ProgressBar value={percentage} />
     {#if onIncrement && !isComplete}
         <button class="increment-btn" onclick={onIncrement}>
-            <i class="ri-add-line"></i> Log Progress
+            <i class="ri-add-line"></i> {t.challenge.logProgress}
         </button>
     {/if}
     {#if isComplete}
-        <div class="complete-badge">Completed!</div>
+        <div class="complete-badge">{t.challenge.completed}</div>
     {/if}
 </GlassCard>
 

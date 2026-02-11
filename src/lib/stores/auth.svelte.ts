@@ -1,4 +1,5 @@
 import { createUser, getUserByEmail, getUserById, seedUserAchievements } from '$lib/db/queries';
+import { t } from '$lib/i18n/index.svelte';
 
 let currentUser = $state<{ id: number; name: string; email: string } | null>(null);
 let isAuthenticated = $state(false);
@@ -57,7 +58,7 @@ export async function register(
 	try {
 		const existing = await getUserByEmail(email);
 		if (existing) {
-			return { success: false, error: 'An account with this email already exists' };
+			return { success: false, error: t.auth.emailExists };
 		}
 
 		const salt = generateSalt();
@@ -73,7 +74,7 @@ export async function register(
 
 		return { success: true };
 	} catch (e) {
-		return { success: false, error: 'Registration failed' };
+		return { success: false, error: t.auth.registrationFailed };
 	}
 }
 
@@ -84,14 +85,14 @@ export async function login(
 	try {
 		const user = await getUserByEmail(email);
 		if (!user || !user.password_hash) {
-			return { success: false, error: 'Invalid email or password' };
+			return { success: false, error: t.auth.invalidCredentials };
 		}
 
 		const [salt, storedHash] = user.password_hash.split(':');
 		const inputHash = await hashPassword(password, salt);
 
 		if (inputHash !== storedHash) {
-			return { success: false, error: 'Invalid email or password' };
+			return { success: false, error: t.auth.invalidCredentials };
 		}
 
 		currentUser = { id: user.id, name: user.name, email: user.email };
@@ -100,7 +101,7 @@ export async function login(
 
 		return { success: true };
 	} catch {
-		return { success: false, error: 'Login failed' };
+		return { success: false, error: t.auth.loginFailed };
 	}
 }
 

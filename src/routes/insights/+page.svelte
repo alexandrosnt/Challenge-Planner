@@ -15,6 +15,7 @@
     } from '$lib/db/queries';
     import { getAuthState } from '$lib/stores/auth.svelte';
     import { dragscroll } from '$lib/actions/dragscroll';
+    import { t } from '$lib/i18n/index.svelte';
 
     let auth = getAuthState();
 
@@ -49,8 +50,8 @@
 
 <header style="padding: 20px 24px;">
     <div>
-        <p style="font-size: 14px; color: var(--text-soft); font-weight: 500;">Overview</p>
-        <h1 style="font-size: 26px; font-weight: 700; letter-spacing: -0.5px;">Insights</h1>
+        <p style="font-size: 14px; color: var(--text-soft); font-weight: 500;">{t.insights.overview}</p>
+        <h1 style="font-size: 26px; font-weight: 700; letter-spacing: -0.5px;">{t.insights.title}</h1>
     </div>
 </header>
 
@@ -60,24 +61,24 @@
         <SavingsCounter totalSaved={stats.total_saved} />
 
         <!-- This Month Overview -->
-        <SectionTitle title="This Month" actionText="" />
+        <SectionTitle title={t.insights.thisMonth} actionText="" />
         <GlassCard>
             <div class="stat-grid">
                 <div class="stat-box">
                     <ProgressRing value={stats.budget_percentage} size={48} strokeWidth={4} />
-                    <p>Budget Used</p>
+                    <p>{t.insights.budgetUsed}</p>
                 </div>
                 <div class="stat-box">
                     <div class="stat-number">{stats.active_items}</div>
-                    <p>Active Items</p>
+                    <p>{t.insights.activeItems}</p>
                 </div>
                 <div class="stat-box">
                     <div class="stat-number sage">{stats.used_up_items}</div>
-                    <p>Used Up</p>
+                    <p>{t.insights.usedUp}</p>
                 </div>
                 <div class="stat-box">
                     <div class="stat-number">{stats.total_usage_count}</div>
-                    <p>Total Uses</p>
+                    <p>{t.insights.totalUses}</p>
                 </div>
             </div>
         </GlassCard>
@@ -87,7 +88,7 @@
 
         <!-- Days Since Last Purchase -->
         {#if daysSinceData.length > 0}
-            <SectionTitle title="Days Since Purchase" actionText="" />
+            <SectionTitle title={t.insights.daysSincePurchase} actionText="" />
             <div class="days-scroll" use:dragscroll>
                 {#each daysSinceData as dsd (dsd.category.id)}
                     <DaysSinceCard category={dsd.category} lastPurchaseDate={dsd.lastPurchaseDate} />
@@ -97,7 +98,7 @@
 
         <!-- Budget Management -->
         {#if budgets.length > 0}
-            <SectionTitle title="Budget Management" actionText="" />
+            <SectionTitle title={t.insights.budgetManagement} actionText="" />
             {#each budgets as budget (budget.id)}
                 <GlassCard>
                     <div class="budget-row">
@@ -106,7 +107,7 @@
                                 {#if budget.category_icon}
                                     <i class={budget.category_icon}></i>
                                 {/if}
-                                <span class="budget-name">{budget.category_name ?? 'Category'}</span>
+                                <span class="budget-name">{budget.category_name ?? t.common.category}</span>
                             </div>
                             <span class="budget-amount">
                                 {Math.round(budget.actual_spent ?? budget.spent)}€ / {budget.monthly_limit}€
@@ -120,7 +121,7 @@
                     {#if budget.carryover && budget.carryover_amount > 0}
                         <div class="carryover-note">
                             <i class="ri-arrow-right-line"></i>
-                            +{budget.carryover_amount.toFixed(2)}€ carried over
+                            +{budget.carryover_amount.toFixed(2)}€ {t.insights.carriedOver}
                         </div>
                     {/if}
                 </GlassCard>
@@ -131,7 +132,7 @@
                 <GlassCard>
                     <div class="budget-row">
                         <div class="budget-info">
-                            <span class="budget-name" style="font-weight: 700;">Total Spending</span>
+                            <span class="budget-name" style="font-weight: 700;">{t.insights.totalSpending}</span>
                         </div>
                         <span class="total-amount">{Math.round(totalBudgetSpent)}€ / {totalBudgetLimit}€</span>
                     </div>

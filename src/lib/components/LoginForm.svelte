@@ -1,6 +1,7 @@
 <script>
     import GlassCard from '$lib/components/GlassCard.svelte';
     import { login, register } from '$lib/stores/auth.svelte';
+    import { t } from '$lib/i18n/index.svelte';
 
     let mode = $state('login');
     let email = $state('');
@@ -29,21 +30,21 @@
         error = '';
 
         if (!email.trim() || !password.trim()) {
-            error = 'Please fill in all required fields.';
+            error = t.login.fillAllFields;
             return;
         }
 
         if (isRegister) {
             if (!displayName.trim()) {
-                error = 'Please enter a display name.';
+                error = t.login.enterDisplayName;
                 return;
             }
             if (password !== confirmPassword) {
-                error = 'Passwords do not match.';
+                error = t.login.passwordsNoMatch;
                 return;
             }
             if (password.length < 6) {
-                error = 'Password must be at least 6 characters.';
+                error = t.login.passwordTooShort;
                 return;
             }
         }
@@ -54,16 +55,16 @@
             if (isRegister) {
                 const result = await register(displayName.trim(), email.trim(), password);
                 if (!result.success) {
-                    error = result.error || 'Registration failed.';
+                    error = result.error || t.auth.registrationFailed;
                 }
             } else {
                 const result = await login(email.trim(), password);
                 if (!result.success) {
-                    error = result.error || 'Login failed.';
+                    error = result.error || t.auth.loginFailed;
                 }
             }
         } catch {
-            error = 'An unexpected error occurred.';
+            error = t.login.unexpectedError;
         } finally {
             submitting = false;
         }
@@ -71,8 +72,8 @@
 </script>
 
 <GlassCard>
-    <h2 class="form-title">{isRegister ? 'Create Account' : 'Welcome Back'}</h2>
-    <p class="form-subtitle">{isRegister ? 'Sign up to get started' : 'Sign in to continue'}</p>
+    <h2 class="form-title">{isRegister ? t.login.createAccount : t.login.welcomeBack}</h2>
+    <p class="form-subtitle">{isRegister ? t.login.signUpToGetStarted : t.login.signInToContinue}</p>
 
     {#if error}
         <p class="error-message">{error}</p>
@@ -80,60 +81,60 @@
 
     {#if isRegister}
         <div class="form-group">
-            <label for="login-display-name">Display Name</label>
+            <label for="login-display-name">{t.login.displayName}</label>
             <input
                 id="login-display-name"
                 type="text"
                 bind:value={displayName}
-                placeholder="Your name"
+                placeholder={t.login.yourName}
             />
         </div>
     {/if}
 
     <div class="form-group">
-        <label for="login-email">Email</label>
+        <label for="login-email">{t.login.email}</label>
         <input
             id="login-email"
             type="email"
             bind:value={email}
-            placeholder="you@example.com"
+            placeholder={t.login.emailPlaceholder}
         />
     </div>
 
     <div class="form-group">
-        <label for="login-password">Password</label>
+        <label for="login-password">{t.login.password}</label>
         <input
             id="login-password"
             type="password"
             bind:value={password}
-            placeholder="Enter password"
+            placeholder={t.login.enterPassword}
         />
     </div>
 
     {#if isRegister}
         <div class="form-group">
-            <label for="login-confirm-password">Confirm Password</label>
+            <label for="login-confirm-password">{t.login.confirmPassword}</label>
             <input
                 id="login-confirm-password"
                 type="password"
                 bind:value={confirmPassword}
-                placeholder="Confirm password"
+                placeholder={t.login.confirmPasswordPlaceholder}
             />
         </div>
     {/if}
 
     <button class="submit-btn" onclick={handleSubmit} disabled={submitting}>
         {#if submitting}
-            {isRegister ? 'Creating Account...' : 'Signing In...'}
+            {isRegister ? t.login.creatingAccount : t.login.signingIn}
         {:else}
-            {isRegister ? 'Create Account' : 'Sign In'}
+            {isRegister ? t.login.createAccount : t.login.signIn}
         {/if}
     </button>
 
     <p class="toggle-text">
-        {isRegister ? 'Already have an account?' : "Don't have an account?"}
+        {isRegister ? t.login.alreadyHaveAccount : t.login.dontHaveAccount}
         <button class="toggle-link" onclick={toggleMode}>
-            {isRegister ? 'Sign In' : 'Create Account'}
+            {isRegister ? t.login.signIn : t.login.createAccount}
         </button>
     </p>
 </GlassCard>
