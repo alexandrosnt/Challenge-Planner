@@ -124,9 +124,10 @@ jobs:
       - name: Sign APK
         if: env.HAS_SIGNING_KEY == 'true'
         id: sign-apk
-        uses: r0adkll/sign-android-release@v1
+        uses: kevin-david/zipalign-sign-android-release@v2
         env:
           HAS_SIGNING_KEY: ${{ secrets.ANDROID_KEY_BASE64 != '' }}
+          BUILD_TOOLS_VERSION: '35.0.0'
         with:
           releaseDirectory: src-tauri/gen/android/app/build/outputs/apk/universal/release
           signingKeyBase64: ${{ secrets.ANDROID_KEY_BASE64 }}

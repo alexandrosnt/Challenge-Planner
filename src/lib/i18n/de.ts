@@ -51,6 +51,8 @@ const de = {
 		yourProducts: 'Deine Produkte',
 		title: 'Inventar',
 		emptyState: 'Noch keine Artikel. Füge welche über den + Button hinzu!',
+		gridView: 'Rasteransicht',
+		listView: 'Listenansicht',
 	},
 	progress: {
 		title: 'Mein Fortschritt',
@@ -191,6 +193,7 @@ const de = {
 		gifted: 'Verschenkt',
 		amountRecovered: 'Zurückgewonnener Betrag',
 		processing: 'Verarbeitung...',
+		markFinished: 'Als aufgebraucht markieren',
 		declutterItem: 'Artikel aussortieren',
 	},
 	login: {

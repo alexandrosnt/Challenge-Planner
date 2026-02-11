@@ -13,9 +13,10 @@
 
     let data = $state<ProgressData | null>(null);
 
+    let usableItems = $derived(data ? data.active_items + data.used_up_items : 0);
     let completionRate = $derived(
-        data && data.total_items > 0
-            ? Math.round((data.used_up_items / data.total_items) * 100)
+        usableItems > 0
+            ? Math.round((data!.used_up_items / usableItems) * 100)
             : 0
     );
 
@@ -57,7 +58,7 @@
         <div class="hero-ring">
             <ProgressRing value={completionRate} size={120} strokeWidth={7} />
             <p class="hero-label">
-                {data.used_up_items} {t.progress.of} {data.total_items} {t.progress.productsFinished}
+                {data.used_up_items} {t.progress.of} {usableItems} {t.progress.productsFinished}
             </p>
         </div>
 
@@ -134,11 +135,11 @@
                         </div>
                         <div class="category-bar">
                             <ProgressBar
-                                value={cat.total > 0 ? Math.round((cat.used_up / cat.total) * 100) : 0}
+                                value={(cat.used_up + cat.active) > 0 ? Math.round((cat.used_up / (cat.used_up + cat.active)) * 100) : 0}
                                 height="6px"
                             />
                         </div>
-                        <span class="category-count">{cat.used_up}/{cat.total}</span>
+                        <span class="category-count">{cat.used_up}/{cat.used_up + cat.active}</span>
                         {#if cat.decluttered > 0}
                             <span class="category-declutter" title="Decluttered">
                                 <i class="ri-delete-bin-line"></i>{cat.decluttered}
@@ -309,6 +310,9 @@
         display: grid;
         grid-template-columns: 1fr 1fr;
         gap: 20px;
+    }
+    .stats-grid.three-col {
+        grid-template-columns: 1fr 1fr 1fr;
     }
     .stat-block {
         display: flex;

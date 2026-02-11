@@ -221,7 +221,8 @@
 
     <!-- My Progress Card -->
     {#if stats}
-        {@const completionPct = stats.total_items > 0 ? Math.round((stats.used_up_items / stats.total_items) * 100) : 0}
+        {@const usable = stats.active_items + stats.used_up_items}
+        {@const completionPct = usable > 0 ? Math.round((stats.used_up_items / usable) * 100) : 0}
         <button class="progress-card" onclick={() => goto('/progress')}>
             <GlassCard style="margin-bottom: 16px; padding: 16px 20px;">
                 <div class="progress-card-inner">

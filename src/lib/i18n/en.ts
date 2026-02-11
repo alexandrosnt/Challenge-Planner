@@ -51,6 +51,8 @@ const en = {
 		yourProducts: 'Your Products',
 		title: 'Inventory',
 		emptyState: 'No items yet. Add some from the + button!',
+		gridView: 'Grid view',
+		listView: 'List view',
 	},
 	progress: {
 		title: 'My Progress',
@@ -191,6 +193,7 @@ const en = {
 		gifted: 'Gifted',
 		amountRecovered: 'Amount Recovered',
 		processing: 'Processing...',
+		markFinished: 'Mark as Finished',
 		declutterItem: 'Declutter Item',
 	},
 	login: {

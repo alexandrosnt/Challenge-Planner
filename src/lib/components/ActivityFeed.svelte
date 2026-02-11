@@ -7,7 +7,7 @@
     /** @param {string} timestamp */
     function timeAgo(timestamp) {
         const now = new Date();
-        const then = new Date(timestamp);
+        const then = new Date(timestamp.endsWith('Z') ? timestamp : timestamp + 'Z');
         const diffMs = now.getTime() - then.getTime();
         const diffMins = Math.floor(diffMs / 60000);
         const diffHours = Math.floor(diffMs / 3600000);

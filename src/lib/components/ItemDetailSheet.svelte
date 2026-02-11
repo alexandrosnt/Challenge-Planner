@@ -1,7 +1,7 @@
 <script>
 	import GlassCard from '$lib/components/GlassCard.svelte';
 	import ProgressBar from '$lib/components/ProgressBar.svelte';
-	import { logUsage, getUsageLog, logDeclutter, getItemWithStats } from '$lib/db/queries';
+	import { logUsage, getUsageLog, logDeclutter, getItemWithStats, markItemUsedUp } from '$lib/db/queries';
 	import { getAuthState } from '$lib/stores/auth.svelte';
 	/** @typedef {import('$lib/db/queries').Item} Item */
 	/** @typedef {import('$lib/db/queries').UsageLogEntry} UsageLogEntry */
@@ -59,6 +59,19 @@
 		try {
 			await logUsage(userId, currentItem.id);
 			await loadData(currentItem.id);
+		} finally {
+			loading = false;
+		}
+	}
+
+	async function handleMarkFinished() {
+		if (!currentItem) return;
+		const userId = auth.currentUser?.id;
+		if (!userId) return;
+		loading = true;
+		try {
+			await markItemUsedUp(userId, currentItem.id);
+			onClose();
 		} finally {
 			loading = false;
 		}
@@ -171,6 +184,10 @@
 					<button class="log-usage-btn" onclick={handleLogUsage} disabled={loading}>
 						<i class="ri-add-circle-line"></i>
 						{loading ? t.itemDetail.logging : t.itemDetail.logUsage}
+					</button>
+					<button class="finished-btn" onclick={handleMarkFinished} disabled={loading}>
+						<i class="ri-checkbox-circle-line"></i>
+						{t.itemDetail.markFinished}
 					</button>
 				{/if}
 
@@ -441,6 +458,34 @@
 
 	.log-usage-btn i {
 		font-size: 18px;
+	}
+
+	.finished-btn {
+		width: calc(100% - 40px);
+		margin: 10px 20px 0;
+		padding: 14px;
+		background: var(--accent-sage, #94B49F);
+		border: none;
+		border-radius: 50px;
+		color: white;
+		font-family: 'Poppins', sans-serif;
+		font-size: 15px;
+		font-weight: 600;
+		cursor: pointer;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 8px;
+		transition: transform 0.2s ease, opacity 0.2s ease;
+	}
+
+	.finished-btn:active {
+		transform: scale(0.97);
+	}
+
+	.finished-btn:disabled {
+		opacity: 0.6;
+		cursor: not-allowed;
 	}
 
 	/* Section Title */

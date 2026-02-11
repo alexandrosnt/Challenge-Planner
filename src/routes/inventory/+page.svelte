@@ -21,6 +21,7 @@
     let selectedCategoryId = $state(0);
     let selectedSubcategoryId = $state(0);
     let selectedStatus = $state('all');
+    let viewMode = $state(/** @type {'grid' | 'list'} */ ('grid'));
     /** @type {import('$lib/db/queries').Item | null} */
     let selectedItem = $state(null);
 
@@ -93,11 +94,14 @@
     }
 </script>
 
-<header style="padding: 20px 24px;">
+<header class="inv-header">
     <div>
         <p style="font-size: 14px; color: var(--text-soft); font-weight: 500;">{t.inventory.yourProducts}</p>
         <h1 style="font-size: 26px; font-weight: 700; letter-spacing: -0.5px;">{t.inventory.title}</h1>
     </div>
+    <button class="view-toggle" onclick={() => viewMode = viewMode === 'grid' ? 'list' : 'grid'} aria-label={viewMode === 'grid' ? t.inventory.listView : t.inventory.gridView}>
+        <i class={viewMode === 'grid' ? 'ri-list-unordered' : 'ri-grid-fill'}></i>
+    </button>
 </header>
 
 <main>
@@ -138,57 +142,114 @@
         </button>
     </div>
 
-    <!-- Items Grid -->
-    {#if loading}
-        <div class="items-grid">
-            {#each Array(6) as _}
-                <GlassCard>
-                    <div class="item-card">
-                        <div class="shimmer" style="width: 50px; height: 50px; border-radius: var(--radius-m); margin: 0 auto 10px;"></div>
-                        <div class="shimmer" style="width: 80px; height: 14px; margin: 0 auto 4px;"></div>
-                        <div class="shimmer" style="width: 50px; height: 10px; margin: 0 auto;"></div>
+    <!-- Items -->
+    {#if viewMode === 'grid'}
+        {#if loading}
+            <div class="items-grid">
+                {#each Array(6) as _}
+                    <GlassCard>
+                        <div class="item-card">
+                            <div class="shimmer" style="width: 50px; height: 50px; border-radius: var(--radius-m); margin: 0 auto 10px;"></div>
+                            <div class="shimmer" style="width: 80px; height: 14px; margin: 0 auto 4px;"></div>
+                            <div class="shimmer" style="width: 50px; height: 10px; margin: 0 auto;"></div>
+                        </div>
+                    </GlassCard>
+                {/each}
+            </div>
+        {/if}
+        <div class="items-grid" class:hidden={loading}>
+            {#each filteredItems as item (item.id)}
+                <button class="item-card-btn" onclick={() => handleItemClick(item)}>
+                    <GlassCard>
+                        <div class="item-card">
+                            <span class="item-status-dot" class:dot-active={item.status === 'active'} class:dot-finished={item.status === 'used_up'} class:dot-decluttered={item.status === 'decluttered'}></span>
+                            <div class="item-icon">
+                                <i class={item.category_icon ?? 'ri-box-3-line'}></i>
+                            </div>
+                            <h3 class="item-name">{item.name}</h3>
+                            {#if item.subcategory_name}
+                                <span class="item-sub">{item.subcategory_name}</span>
+                            {:else}
+                                <span class="item-sub">{item.category_name}</span>
+                            {/if}
+                            <div class="item-meta">
+                                {#if item.cost_per_use != null}
+                                    <span class="cost-per-use">{item.cost_per_use.toFixed(2)}€/use</span>
+                                {/if}
+                                {#if (item.usage_count ?? 0) > 0}
+                                    <span class="usage-badge">{item.usage_count}x</span>
+                                {/if}
+                            </div>
+                        </div>
+                    </GlassCard>
+                </button>
+            {:else}
+                <div class="empty-state">
+                    <i class="ri-inbox-line"></i>
+                    <p>{t.inventory.emptyState}</p>
+                </div>
+            {/each}
+        </div>
+    {:else}
+        <!-- List View -->
+        <div class="items-list" class:hidden={loading}>
+            {#each filteredItems as item (item.id)}
+                <button class="list-item-btn" onclick={() => handleItemClick(item)}>
+                    <div class="list-item">
+                        <div class="list-item-icon">
+                            <i class={item.category_icon ?? 'ri-box-3-line'}></i>
+                        </div>
+                        <div class="list-item-info">
+                            <h3 class="list-item-name">{item.name}</h3>
+                            <span class="list-item-sub">{item.subcategory_name || item.category_name}</span>
+                        </div>
+                        <div class="list-item-right">
+                            <span class="list-status-badge" class:status-active={item.status === 'active'} class:status-finished={item.status === 'used_up'} class:status-decluttered={item.status === 'decluttered'}>
+                                {#if item.status === 'active'}
+                                    {t.common.active}
+                                {:else if item.status === 'used_up'}
+                                    {t.common.finished}
+                                {:else}
+                                    {t.common.decluttered}
+                                {/if}
+                            </span>
+                            {#if (item.usage_count ?? 0) > 0}
+                                <span class="list-usage">{item.usage_count}x</span>
+                            {/if}
+                        </div>
                     </div>
-                </GlassCard>
+                </button>
+            {:else}
+                <div class="empty-state">
+                    <i class="ri-inbox-line"></i>
+                    <p>{t.inventory.emptyState}</p>
+                </div>
             {/each}
         </div>
     {/if}
-    <div class="items-grid" class:hidden={loading}>
-        {#each filteredItems as item (item.id)}
-            <button class="item-card-btn" onclick={() => handleItemClick(item)}>
-                <GlassCard>
-                    <div class="item-card">
-                        <div class="item-icon">
-                            <i class={item.category_icon ?? 'ri-box-3-line'}></i>
-                        </div>
-                        <h3 class="item-name">{item.name}</h3>
-                        {#if item.subcategory_name}
-                            <span class="item-sub">{item.subcategory_name}</span>
-                        {:else}
-                            <span class="item-sub">{item.category_name}</span>
-                        {/if}
-                        <div class="item-meta">
-                            {#if item.cost_per_use != null}
-                                <span class="cost-per-use">{item.cost_per_use.toFixed(2)}€/use</span>
-                            {/if}
-                            {#if (item.usage_count ?? 0) > 0}
-                                <span class="usage-badge">{item.usage_count}x</span>
-                            {/if}
-                        </div>
-                    </div>
-                </GlassCard>
-            </button>
-        {:else}
-            <div class="empty-state">
-                <i class="ri-inbox-line"></i>
-                <p>{t.inventory.emptyState}</p>
-            </div>
-        {/each}
-    </div>
 </main>
 
 <ItemDetailSheet item={selectedItem} onClose={handleDetailClose} />
 
 <style>
+    .inv-header {
+        padding: 20px 24px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+    .view-toggle {
+        width: 40px; height: 40px;
+        border-radius: 50%;
+        border: 1px solid rgba(0,0,0,0.06);
+        background: white;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 20px; color: var(--text-soft);
+        cursor: pointer;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+        transition: 0.2s;
+    }
+    .view-toggle:active { transform: scale(0.95); background: #f5f5f5; }
     .filter-scroll {
         display: flex;
         gap: 10px;
@@ -266,7 +327,7 @@
         cursor: pointer;
         width: 100%;
     }
-    .item-card { text-align: center; }
+    .item-card { text-align: center; position: relative; }
     .item-icon {
         width: 50px; height: 50px; margin: 0 auto 10px;
         background: #FFF0F3; border-radius: var(--radius-m);
@@ -306,5 +367,94 @@
     @keyframes shimmer {
         0% { background-position: 200% 0; }
         100% { background-position: -200% 0; }
+    }
+
+    /* Status dot on grid cards */
+    .item-status-dot {
+        position: absolute;
+        top: 0; right: 0;
+        width: 10px; height: 10px;
+        border-radius: 50%;
+        border: 2px solid white;
+    }
+    .dot-active { background: #4CAF50; }
+    .dot-finished { background: var(--accent-sage, #94B49F); }
+    .dot-decluttered { background: var(--text-soft); }
+
+    /* List view */
+    .items-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+    .list-item-btn {
+        background: none;
+        border: none;
+        padding: 0;
+        text-align: left;
+        cursor: pointer;
+        width: 100%;
+    }
+    .list-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 14px 16px;
+        background: var(--glass-bg);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid var(--glass-border);
+        border-radius: var(--radius-s);
+        box-shadow: var(--glass-shadow);
+        transition: transform 0.2s;
+    }
+    .list-item:active { transform: scale(0.98); }
+    .list-item-icon {
+        width: 42px; height: 42px;
+        background: #FFF0F3; border-radius: var(--radius-s);
+        display: flex; align-items: center; justify-content: center;
+        font-size: 20px; color: var(--accent-pink);
+        flex-shrink: 0;
+    }
+    .list-item-info {
+        flex: 1;
+        min-width: 0;
+    }
+    .list-item-name {
+        font-size: 14px; font-weight: 600; color: var(--text-dark);
+        margin: 0;
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .list-item-sub {
+        font-size: 11px; color: var(--text-soft);
+        text-transform: uppercase; letter-spacing: 0.3px;
+    }
+    .list-item-right {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 4px;
+        flex-shrink: 0;
+    }
+    .list-status-badge {
+        font-size: 10px; font-weight: 600;
+        padding: 3px 10px;
+        border-radius: 50px;
+        letter-spacing: 0.3px;
+    }
+    .list-status-badge.status-active {
+        background: rgba(76, 175, 80, 0.15);
+        color: #2e7d32;
+    }
+    .list-status-badge.status-finished {
+        background: rgba(148, 180, 159, 0.2);
+        color: #6b8f5e;
+    }
+    .list-status-badge.status-decluttered {
+        background: rgba(0, 0, 0, 0.06);
+        color: var(--text-soft);
+    }
+    .list-usage {
+        font-size: 11px; font-weight: 700; color: var(--accent-pink);
     }
 </style>
