@@ -29,3 +29,7 @@ CLAUDE.md
 
 # Backups
 *.bak
+
+# Database files
+*.db
+*.db-*
