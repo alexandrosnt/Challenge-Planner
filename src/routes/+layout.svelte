@@ -10,7 +10,7 @@
 	import LanguageWelcome from '$lib/components/LanguageWelcome.svelte';
 	import { initDb } from '$lib/db/client';
 	import { initializeDatabase } from '$lib/db/queries';
-	import { startSync } from '$lib/db/sync';
+	import { startSync, triggerSync } from '$lib/db/sync';
 	import { checkSession, getAuthState } from '$lib/stores/auth.svelte';
 	import { getModalState } from '$lib/stores/modal.svelte';
 	import { onMount } from 'svelte';
@@ -30,6 +30,8 @@
 		try {
 			await initDb();
 			await initializeDatabase();
+			// Sync again after schema init to pull remote user data on reinstall
+			try { await triggerSync(); } catch {}
 			dbReady = true;
 			startSync();
 			try {

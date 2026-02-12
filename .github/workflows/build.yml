@@ -52,6 +52,11 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
+      - name: Write Turso env
+        run: |
+          echo "VITE_TURSO_DATABASE_URL=${{ secrets.TURSO_DATABASE_URL }}" >> .env
+          echo "VITE_TURSO_AUTH_TOKEN=${{ secrets.TURSO_AUTH_TOKEN }}" >> .env
+
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0.6
         env:
@@ -110,6 +115,11 @@ jobs:
 
       - name: Install frontend dependencies
         run: npm ci
+
+      - name: Write Turso env
+        run: |
+          echo "VITE_TURSO_DATABASE_URL=${{ secrets.TURSO_DATABASE_URL }}" >> .env
+          echo "VITE_TURSO_AUTH_TOKEN=${{ secrets.TURSO_AUTH_TOKEN }}" >> .env
 
       - name: Init Tauri Android
         run: npx tauri android init
@@ -197,6 +207,11 @@ jobs:
 
       - name: Install frontend dependencies
         run: npm ci
+
+      - name: Write Turso env
+        run: |
+          echo "VITE_TURSO_DATABASE_URL=${{ secrets.TURSO_DATABASE_URL }}" >> .env
+          echo "VITE_TURSO_AUTH_TOKEN=${{ secrets.TURSO_AUTH_TOKEN }}" >> .env
 
       - name: Init Tauri iOS
         run: npx tauri ios init
