@@ -100,12 +100,26 @@ async fn execute_stmt(
     })
 }
 
-fn normalize_turso_url(url: &str) -> String {
+fn alt_url(url: &str) -> String {
     if url.starts_with("libsql://") {
         url.replacen("libsql://", "https://", 1)
+    } else if url.starts_with("https://") {
+        url.replacen("https://", "libsql://", 1)
     } else {
         url.to_string()
     }
+}
+
+async fn try_remote_replica(path: &str, url: &str, token: &str) -> Result<Database, String> {
+    // Only wipe metadata (not WAL/SHM — those hold local data)
+    let metadata_path = format!("{}-metadata", path);
+    let _ = std::fs::remove_file(&metadata_path);
+
+    Builder::new_remote_replica(path, url.to_string(), token.to_string())
+        .read_your_writes(true)
+        .build()
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -128,44 +142,43 @@ pub async fn db_init(
     );
 
     let db = if is_remote {
-        let remote_url = normalize_turso_url(url.as_deref().unwrap());
+        let original_url = url.as_deref().unwrap().to_string();
+        let alt = alt_url(&original_url);
         let token = auth_token.clone().unwrap();
 
-        // Retry remote replica up to 3 times — mobile network may not be ready at launch
+        // Try original URL, then alternate scheme, then retry original after delay
+        let urls_to_try = [
+            ("original", original_url.as_str()),
+            ("alt-scheme", alt.as_str()),
+        ];
+
         let mut last_err = String::new();
         let mut db_opt: Option<Database> = None;
-        for attempt in 1..=3 {
-            // Wipe stale metadata files before each attempt
-            for suffix in &["-client_wal_index", "-shm", "-wal", "-metadata"] {
-                let mut p = db_path.clone().into_os_string();
-                p.push(suffix);
-                let _ = std::fs::remove_file(&p);
-            }
 
-            match Builder::new_remote_replica(&path_str, remote_url.clone(), token.clone())
-                .read_your_writes(true)
-                .build()
-                .await
-            {
-                Ok(db) => {
-                    log::info!("Remote replica connected (attempt {})", attempt);
-                    db_opt = Some(db);
-                    break;
-                }
-                Err(e) => {
-                    last_err = e.to_string();
-                    log::warn!("Remote replica attempt {} failed: {}", attempt, last_err);
-                    if attempt < 3 {
-                        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+        for round in 0..2 {
+            for (label, try_url) in &urls_to_try {
+                match try_remote_replica(&path_str, try_url, &token).await {
+                    Ok(db) => {
+                        log::info!("Remote replica connected via {} (round {}): {}", label, round, try_url);
+                        db_opt = Some(db);
+                        break;
+                    }
+                    Err(e) => {
+                        last_err = e.clone();
+                        log::warn!("Remote replica {} (round {}) failed: {}", label, round, e);
                     }
                 }
+            }
+            if db_opt.is_some() { break; }
+            if round == 0 {
+                tokio::time::sleep(std::time::Duration::from_secs(2)).await;
             }
         }
 
         match db_opt {
             Some(db) => db,
             None => {
-                log::error!("All remote replica attempts failed: {}. Falling back to local.", last_err);
+                log::error!("All remote attempts failed: {}. Falling back to local.", last_err);
                 Builder::new_local(&path_str)
                     .build()
                     .await
@@ -173,6 +186,7 @@ pub async fn db_init(
             }
         }
     } else {
+        log::warn!("No Turso URL/token provided — using local-only database");
         Builder::new_local(&path_str)
             .build()
             .await
@@ -181,10 +195,10 @@ pub async fn db_init(
 
     let conn = db.connect().map_err(|e| e.to_string())?;
 
-    // If remote replica, try initial sync to pull cloud data
+    // Try initial sync to pull cloud data
     if is_remote {
         match db.sync().await {
-            Ok(rep) => log::info!("Initial sync: {} frames", rep.frames_synced()),
+            Ok(rep) => log::info!("Initial sync pulled {} frames", rep.frames_synced()),
             Err(e) => log::warn!("Initial sync failed: {}", e),
         }
     }
