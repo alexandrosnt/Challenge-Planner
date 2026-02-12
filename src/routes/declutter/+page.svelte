@@ -1,20 +1,67 @@
 <script lang="ts">
     import GlassCard from '$lib/components/GlassCard.svelte';
-    import { getRefreshSignal } from '$lib/stores/refresh.svelte';
+    import { getRefreshSignal, triggerRefresh } from '$lib/stores/refresh.svelte';
     import SectionTitle from '$lib/components/SectionTitle.svelte';
-    import { loadDeclutterPageData, logDeclutter, checkAchievements, type DeclutterPageData, type DeclutterCandidate } from '$lib/db/queries';
+    import SelectModeButton from '$lib/components/SelectModeButton.svelte';
+    import SelectionBar from '$lib/components/SelectionBar.svelte';
+    import { loadDeclutterPageData, checkAchievements, deleteDeclutterLogEntry, deleteDeclutterLogEntries, type DeclutterPageData } from '$lib/db/queries';
     import { getAuthState } from '$lib/stores/auth.svelte';
     import { t } from '$lib/i18n/index.svelte';
 
     let auth = getAuthState();
 
     let data = $state<DeclutterPageData | null>(null);
-    let selectedItem = $state<DeclutterCandidate | null>(null);
-    let method = $state('donated');
-    let reason = $state('');
-    let amountRecovered = $state('');
     let refresh = getRefreshSignal();
-    let processing = $state(false);
+
+    // Select mode for history
+    let selectMode = $state(false);
+    let selectedHistoryIds = $state(new Set<number>());
+    let deletingSelected = $state(false);
+
+    function toggleSelectMode() {
+        selectMode = !selectMode;
+        selectedHistoryIds = new Set();
+    }
+
+    function toggleHistorySelection(id: number) {
+        const next = new Set(selectedHistoryIds);
+        if (next.has(id)) next.delete(id); else next.add(id);
+        selectedHistoryIds = next;
+    }
+
+    function selectAllHistory() {
+        if (!data) return;
+        selectedHistoryIds = new Set(data.decluttered.map(d => d.id));
+    }
+
+    function deselectAllHistory() {
+        selectedHistoryIds = new Set();
+    }
+
+    async function handleDeleteSelectedHistory() {
+        const userId = auth.currentUser?.id;
+        if (!userId || selectedHistoryIds.size === 0) return;
+        if (!confirm(t.common.confirmDeleteMultiple)) return;
+        deletingSelected = true;
+        try {
+            await deleteDeclutterLogEntries(userId, [...selectedHistoryIds]);
+            selectedHistoryIds = new Set();
+            selectMode = false;
+            triggerRefresh();
+            await loadData();
+        } finally {
+            deletingSelected = false;
+        }
+    }
+
+    async function handleInlineDeleteHistory(e: Event, id: number) {
+        e.stopPropagation();
+        const userId = auth.currentUser?.id;
+        if (!userId) return;
+        await deleteDeclutterLogEntry(userId, id);
+        triggerRefresh();
+        await loadData();
+    }
 
     let donatedItems = $derived(data ? data.decluttered.filter(d => d.method === 'donated') : []);
     let soldItems = $derived(data ? data.decluttered.filter(d => d.method === 'sold') : []);
@@ -28,40 +75,6 @@
             data = await loadDeclutterPageData(userId);
         } catch (e) {
             console.error('Failed to load declutter data:', e);
-        }
-    }
-
-    function selectItem(item: DeclutterCandidate, selectedMethod: string) {
-        selectedItem = item;
-        method = selectedMethod;
-        reason = '';
-        amountRecovered = '';
-    }
-
-    function cancelSelection() {
-        selectedItem = null;
-    }
-
-    async function confirmDeclutter() {
-        if (!selectedItem) return;
-        const userId = auth.currentUser?.id;
-        if (!userId) return;
-        processing = true;
-        try {
-            await logDeclutter(
-                userId,
-                selectedItem.id,
-                method,
-                reason || undefined,
-                method === 'sold' ? Number(amountRecovered) || 0 : 0
-            );
-            selectedItem = null;
-            await loadData();
-            await checkAchievements(userId);
-        } catch (e) {
-            console.error('Failed to declutter item:', e);
-        } finally {
-            processing = false;
         }
     }
 
@@ -81,6 +94,9 @@
 <!-- Header -->
 <header class="page-header">
     <h1 class="page-title">{t.declutter.title}</h1>
+    {#if data && data.decluttered.length > 0}
+        <SelectModeButton active={selectMode} onToggle={toggleSelectMode} />
+    {/if}
 </header>
 
 <main>
@@ -117,121 +133,6 @@
             {/if}
         </GlassCard>
 
-        <!-- Active Items to Declutter -->
-        <SectionTitle title={t.declutter.readyToLetGo} actionText="{data.candidates.length} {t.common.items}" />
-
-        {#if data.candidates.length > 0}
-            <div class="candidates-grid">
-                {#each data.candidates as item (item.id)}
-                    <div class="candidate-card" class:selected={selectedItem?.id === item.id}>
-                        <div class="candidate-info">
-                            <i class="{item.category_icon} candidate-icon"></i>
-                            <div class="candidate-text">
-                                <span class="candidate-name">{item.name}</span>
-                                <span class="candidate-category">{item.subcategory_name ?? item.category_name}</span>
-                            </div>
-                        </div>
-                        <div class="action-buttons">
-                            <button
-                                class="action-btn donate"
-                                aria-label="Donate {item.name}"
-                                onclick={() => selectItem(item, 'donated')}
-                            >
-                                <i class="ri-heart-line"></i>
-                            </button>
-                            <button
-                                class="action-btn sell"
-                                aria-label="Sell {item.name}"
-                                onclick={() => selectItem(item, 'sold')}
-                            >
-                                <i class="ri-money-dollar-circle-line"></i>
-                            </button>
-                            <button
-                                class="action-btn gift"
-                                aria-label="Gift {item.name}"
-                                onclick={() => selectItem(item, 'gifted')}
-                            >
-                                <i class="ri-gift-line"></i>
-                            </button>
-                            <button
-                                class="action-btn trash"
-                                aria-label="Trash {item.name}"
-                                onclick={() => selectItem(item, 'trashed')}
-                            >
-                                <i class="ri-delete-bin-line"></i>
-                            </button>
-                        </div>
-                    </div>
-                {/each}
-            </div>
-        {:else}
-            <GlassCard>
-                <div class="empty-state">
-                    <i class="ri-checkbox-circle-line empty-icon"></i>
-                    <p class="empty-text">{t.declutter.emptyState}</p>
-                </div>
-            </GlassCard>
-        {/if}
-
-        <!-- Confirmation Sheet -->
-        {#if selectedItem}
-            <div class="confirmation-sheet">
-                <GlassCard style="border: 2px solid var(--accent-pink);">
-                    <div class="confirm-header">
-                        <i class="{selectedItem.category_icon} confirm-item-icon"></i>
-                        <div class="confirm-item-info">
-                            <span class="confirm-item-name">{selectedItem.name}</span>
-                            <span class="confirm-method">
-                                {#if method === 'donated'}
-                                    <i class="ri-heart-line"></i> {t.declutter.donate}
-                                {:else if method === 'sold'}
-                                    <i class="ri-money-dollar-circle-line"></i> {t.declutter.sell}
-                                {:else if method === 'gifted'}
-                                    <i class="ri-gift-line"></i> {t.declutter.gift}
-                                {:else}
-                                    <i class="ri-delete-bin-line"></i> {t.declutter.trash}
-                                {/if}
-                            </span>
-                        </div>
-                    </div>
-
-                    <textarea
-                        class="reason-input"
-                        placeholder={t.declutter.reasonPlaceholder}
-                        bind:value={reason}
-                        rows="2"
-                    ></textarea>
-
-                    {#if method === 'sold'}
-                        <div class="amount-input-wrapper">
-                            <span class="amount-prefix">&euro;</span>
-                            <input
-                                type="number"
-                                class="amount-input"
-                                placeholder={t.declutter.amountRecovered}
-                                bind:value={amountRecovered}
-                                min="0"
-                                step="0.01"
-                            />
-                        </div>
-                    {/if}
-
-                    <div class="confirm-actions">
-                        <button class="btn-cancel" onclick={cancelSelection} disabled={processing}>
-                            {t.common.cancel}
-                        </button>
-                        <button class="btn-confirm" onclick={confirmDeclutter} disabled={processing}>
-                            {#if processing}
-                                <i class="ri-loader-4-line spin"></i> {t.declutter.processing}
-                            {:else}
-                                {t.common.confirm}
-                            {/if}
-                        </button>
-                    </div>
-                </GlassCard>
-            </div>
-        {/if}
-
         <!-- Already Decluttered -->
         {#if data.decluttered.length > 0}
             <SectionTitle title={t.declutter.alreadyDecluttered} actionText="{data.decluttered.length} {t.common.total}" />
@@ -245,12 +146,19 @@
                     </div>
                     <GlassCard>
                         {#each donatedItems as item (item.id)}
-                            <div class="decluttered-row">
+                            <!-- svelte-ignore a11y_click_events_have_key_events -->
+                            <!-- svelte-ignore a11y_no_static_element_interactions -->
+                            <div class="decluttered-row" class:selected-row={selectMode && selectedHistoryIds.has(item.id)} onclick={selectMode ? () => toggleHistorySelection(item.id) : undefined}>
                                 <i class="{item.category_icon} decluttered-item-icon"></i>
                                 <div class="decluttered-item-info">
                                     <span class="decluttered-item-name">{item.item_name}</span>
                                     <span class="decluttered-item-meta">{item.category_name} &middot; {formatDate(item.created_at)}</span>
                                 </div>
+                                {#if !selectMode}
+                                    <button class="inline-delete-btn" onclick={(e) => handleInlineDeleteHistory(e, item.id)} aria-label={t.declutter.deleteRecord}>
+                                        <i class="ri-delete-bin-6-line"></i>
+                                    </button>
+                                {/if}
                             </div>
                         {/each}
                     </GlassCard>
@@ -266,14 +174,21 @@
                     </div>
                     <GlassCard>
                         {#each soldItems as item (item.id)}
-                            <div class="decluttered-row">
+                            <!-- svelte-ignore a11y_click_events_have_key_events -->
+                            <!-- svelte-ignore a11y_no_static_element_interactions -->
+                            <div class="decluttered-row" class:selected-row={selectMode && selectedHistoryIds.has(item.id)} onclick={selectMode ? () => toggleHistorySelection(item.id) : undefined}>
                                 <i class="{item.category_icon} decluttered-item-icon"></i>
                                 <div class="decluttered-item-info">
                                     <span class="decluttered-item-name">{item.item_name}</span>
                                     <span class="decluttered-item-meta">{item.category_name} &middot; {formatDate(item.created_at)}</span>
                                 </div>
-                                {#if item.amount_recovered > 0}
+                                {#if item.amount_recovered > 0 && !selectMode}
                                     <span class="recovered-amount">+{item.amount_recovered.toFixed(2)}&euro;</span>
+                                {/if}
+                                {#if !selectMode}
+                                    <button class="inline-delete-btn" onclick={(e) => handleInlineDeleteHistory(e, item.id)} aria-label={t.declutter.deleteRecord}>
+                                        <i class="ri-delete-bin-6-line"></i>
+                                    </button>
                                 {/if}
                             </div>
                         {/each}
@@ -290,12 +205,19 @@
                     </div>
                     <GlassCard>
                         {#each giftedItems as item (item.id)}
-                            <div class="decluttered-row">
+                            <!-- svelte-ignore a11y_click_events_have_key_events -->
+                            <!-- svelte-ignore a11y_no_static_element_interactions -->
+                            <div class="decluttered-row" class:selected-row={selectMode && selectedHistoryIds.has(item.id)} onclick={selectMode ? () => toggleHistorySelection(item.id) : undefined}>
                                 <i class="{item.category_icon} decluttered-item-icon"></i>
                                 <div class="decluttered-item-info">
                                     <span class="decluttered-item-name">{item.item_name}</span>
                                     <span class="decluttered-item-meta">{item.category_name} &middot; {formatDate(item.created_at)}</span>
                                 </div>
+                                {#if !selectMode}
+                                    <button class="inline-delete-btn" onclick={(e) => handleInlineDeleteHistory(e, item.id)} aria-label={t.declutter.deleteRecord}>
+                                        <i class="ri-delete-bin-6-line"></i>
+                                    </button>
+                                {/if}
                             </div>
                         {/each}
                     </GlassCard>
@@ -311,12 +233,19 @@
                     </div>
                     <GlassCard>
                         {#each trashedItems as item (item.id)}
-                            <div class="decluttered-row">
+                            <!-- svelte-ignore a11y_click_events_have_key_events -->
+                            <!-- svelte-ignore a11y_no_static_element_interactions -->
+                            <div class="decluttered-row" class:selected-row={selectMode && selectedHistoryIds.has(item.id)} onclick={selectMode ? () => toggleHistorySelection(item.id) : undefined}>
                                 <i class="{item.category_icon} decluttered-item-icon"></i>
                                 <div class="decluttered-item-info">
                                     <span class="decluttered-item-name">{item.item_name}</span>
                                     <span class="decluttered-item-meta">{item.category_name} &middot; {formatDate(item.created_at)}</span>
                                 </div>
+                                {#if !selectMode}
+                                    <button class="inline-delete-btn" onclick={(e) => handleInlineDeleteHistory(e, item.id)} aria-label={t.declutter.deleteRecord}>
+                                        <i class="ri-delete-bin-6-line"></i>
+                                    </button>
+                                {/if}
                             </div>
                         {/each}
                     </GlassCard>
@@ -337,15 +266,7 @@
             </div>
         </GlassCard>
 
-        <div class="skeleton-line shimmer" style="width: 140px; height: 18px; margin-bottom: 15px;"></div>
-
-        <div class="candidates-grid">
-            {#each Array(4) as _, i (i)}
-                <div class="skeleton-candidate shimmer"></div>
-            {/each}
-        </div>
-
-        <div class="skeleton-line shimmer" style="width: 160px; height: 18px; margin-bottom: 15px; margin-top: 24px;"></div>
+        <div class="skeleton-line shimmer" style="width: 160px; height: 18px; margin-bottom: 15px; margin-top: 16px;"></div>
 
         <div class="skeleton-line shimmer" style="width: 100px; height: 16px; margin-bottom: 10px;"></div>
         <GlassCard>
@@ -360,12 +281,21 @@
     {/if}
 </main>
 
+<SelectionBar
+    selectedCount={selectedHistoryIds.size}
+    totalCount={data ? data.decluttered.length : 0}
+    onSelectAll={selectAllHistory}
+    onDeselectAll={deselectAllHistory}
+    onDeleteSelected={handleDeleteSelectedHistory}
+    deleting={deletingSelected}
+/>
+
 <style>
     /* Header */
     .page-header {
         display: flex;
         align-items: center;
-        justify-content: center;
+        justify-content: space-between;
         padding: 20px 24px;
     }
     .page-title {
@@ -428,274 +358,6 @@
     }
     .recovered-banner i {
         font-size: 18px;
-    }
-
-    /* Candidates Grid */
-    .candidates-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 12px;
-        margin-bottom: 24px;
-    }
-    .candidate-card {
-        background: var(--glass-bg);
-        backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
-        border: 1px solid var(--glass-border);
-        border-radius: var(--radius-m);
-        padding: 14px;
-        display: flex;
-        flex-direction: column;
-        gap: 12px;
-        transition: transform 0.2s, border-color 0.2s;
-    }
-    .candidate-card.selected {
-        border-color: var(--accent-pink);
-        box-shadow: 0 0 0 2px rgba(233, 30, 99, 0.15);
-    }
-    .candidate-card:active {
-        transform: scale(0.97);
-    }
-    .candidate-info {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-    }
-    .candidate-icon {
-        font-size: 20px;
-        color: var(--accent-pink);
-        width: 34px;
-        height: 34px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        border-radius: 50%;
-        background: rgba(233, 30, 99, 0.08);
-        flex-shrink: 0;
-    }
-    .candidate-text {
-        display: flex;
-        flex-direction: column;
-        gap: 2px;
-        min-width: 0;
-    }
-    .candidate-name {
-        font-size: 13px;
-        font-weight: 600;
-        color: var(--text-dark);
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-    .candidate-category {
-        font-size: 11px;
-        color: var(--text-soft);
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-
-    /* Action Buttons */
-    .action-buttons {
-        display: flex;
-        gap: 6px;
-        justify-content: center;
-    }
-    .action-btn {
-        width: 32px;
-        height: 32px;
-        border-radius: 50%;
-        border: none;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 15px;
-        cursor: pointer;
-        transition: transform 0.2s, box-shadow 0.2s;
-    }
-    .action-btn:active {
-        transform: scale(0.85);
-    }
-    .action-btn.donate {
-        background: #FCE4EC;
-        color: #E91E63;
-    }
-    .action-btn.sell {
-        background: #E8F5E9;
-        color: #4CAF50;
-    }
-    .action-btn.gift {
-        background: #FFF3E0;
-        color: #FF9800;
-    }
-    .action-btn.trash {
-        background: #F5F5F5;
-        color: #9E9E9E;
-    }
-
-    /* Empty State */
-    .empty-state {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        padding: 24px 0;
-        gap: 12px;
-    }
-    .empty-icon {
-        font-size: 40px;
-        color: var(--accent-sage);
-    }
-    .empty-text {
-        font-size: 14px;
-        font-weight: 500;
-        color: var(--text-soft);
-        text-align: center;
-    }
-
-    /* Confirmation Sheet */
-    .confirmation-sheet {
-        margin-bottom: 0;
-    }
-    .confirm-header {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        margin-bottom: 16px;
-    }
-    .confirm-item-icon {
-        font-size: 24px;
-        color: var(--accent-pink);
-        width: 44px;
-        height: 44px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        border-radius: 50%;
-        background: rgba(233, 30, 99, 0.08);
-        flex-shrink: 0;
-    }
-    .confirm-item-info {
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-    }
-    .confirm-item-name {
-        font-size: 16px;
-        font-weight: 700;
-        color: var(--text-dark);
-    }
-    .confirm-method {
-        font-size: 13px;
-        font-weight: 600;
-        color: var(--accent-pink);
-        display: flex;
-        align-items: center;
-        gap: 4px;
-    }
-    .reason-input {
-        width: 100%;
-        padding: 12px;
-        border: 1px solid var(--glass-border);
-        border-radius: var(--radius-s);
-        font-family: 'Poppins', sans-serif;
-        font-size: 13px;
-        color: var(--text-dark);
-        background: rgba(255, 255, 255, 0.5);
-        resize: none;
-        outline: none;
-        transition: border-color 0.2s;
-        box-sizing: border-box;
-    }
-    .reason-input:focus {
-        border-color: var(--accent-pink);
-    }
-    .amount-input-wrapper {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        margin-top: 10px;
-        padding: 10px 12px;
-        border: 1px solid var(--glass-border);
-        border-radius: var(--radius-s);
-        background: rgba(255, 255, 255, 0.5);
-        transition: border-color 0.2s;
-    }
-    .amount-input-wrapper:focus-within {
-        border-color: #4CAF50;
-    }
-    .amount-prefix {
-        font-size: 15px;
-        font-weight: 700;
-        color: #4CAF50;
-    }
-    .amount-input {
-        flex: 1;
-        border: none;
-        outline: none;
-        background: transparent;
-        font-family: 'Poppins', sans-serif;
-        font-size: 14px;
-        font-weight: 600;
-        color: var(--text-dark);
-    }
-    .amount-input::placeholder {
-        color: var(--text-soft);
-        font-weight: 400;
-    }
-    .confirm-actions {
-        display: flex;
-        gap: 10px;
-        margin-top: 16px;
-    }
-    .btn-cancel {
-        flex: 1;
-        padding: 12px;
-        border-radius: var(--radius-s);
-        border: 1px solid var(--glass-border);
-        background: transparent;
-        font-family: 'Poppins', sans-serif;
-        font-size: 14px;
-        font-weight: 600;
-        color: var(--text-soft);
-        cursor: pointer;
-        transition: transform 0.2s;
-    }
-    .btn-cancel:active {
-        transform: scale(0.95);
-    }
-    .btn-confirm {
-        flex: 1;
-        padding: 12px;
-        border-radius: var(--radius-s);
-        border: none;
-        background: var(--primary-gradient);
-        font-family: 'Poppins', sans-serif;
-        font-size: 14px;
-        font-weight: 600;
-        color: #fff;
-        cursor: pointer;
-        transition: transform 0.2s;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 6px;
-    }
-    .btn-confirm:active {
-        transform: scale(0.95);
-    }
-    .btn-confirm:disabled,
-    .btn-cancel:disabled {
-        opacity: 0.6;
-        cursor: not-allowed;
-    }
-
-    /* Spinner */
-    .spin {
-        animation: spin 1s linear infinite;
-    }
-    @keyframes spin {
-        from { transform: rotate(0deg); }
-        to { transform: rotate(360deg); }
     }
 
     /* Decluttered Sections */
@@ -773,6 +435,27 @@
         color: #4CAF50;
         flex-shrink: 0;
     }
+    .inline-delete-btn {
+        background: none;
+        border: none;
+        padding: 4px;
+        cursor: pointer;
+        color: var(--text-soft);
+        font-size: 16px;
+        transition: color 0.2s, transform 0.15s;
+        -webkit-tap-highlight-color: transparent;
+        display: flex;
+        align-items: center;
+        flex-shrink: 0;
+    }
+    .inline-delete-btn:active {
+        color: var(--accent-pink);
+        transform: scale(0.85);
+    }
+    .selected-row {
+        background: rgba(233, 30, 99, 0.04);
+        border-radius: 8px;
+    }
 
     /* Skeleton Preloader */
     .shimmer {
@@ -790,10 +473,6 @@
     }
     .skeleton-circle {
         border-radius: 50%;
-    }
-    .skeleton-candidate {
-        height: 110px;
-        border-radius: var(--radius-m);
     }
     .skeleton-decluttered-row {
         display: flex;

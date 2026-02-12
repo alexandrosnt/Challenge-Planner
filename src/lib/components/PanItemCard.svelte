@@ -1,5 +1,6 @@
 <script lang="ts">
 	import ProgressBar from '$lib/components/ProgressBar.svelte';
+	import SelectableCheckbox from './SelectableCheckbox.svelte';
 	import { t } from '$lib/i18n/index.svelte';
 
 	interface PanItem {
@@ -17,11 +18,17 @@
 		onMarkEmptied,
 		onRemove,
 		onEdit,
+		selectMode = false,
+		selected = false,
+		onSelect,
 	}: {
 		item: PanItem;
 		onMarkEmptied?: (id: number) => void;
 		onRemove?: (id: number) => void;
 		onEdit?: (id: number) => void;
+		selectMode?: boolean;
+		selected?: boolean;
+		onSelect?: (id: number) => void;
 	} = $props();
 
 	let percentage = $derived(
@@ -30,16 +37,28 @@
 	let isComplete = $derived(item.emptied >= item.quantity);
 </script>
 
-<div class="pan-item-card">
-	{#if onEdit}
-		<button class="edit-btn" onclick={() => onEdit(item.id)} aria-label={t.panProject.editQuantity}>
-			<i class="ri-pencil-line"></i>
-		</button>
-	{/if}
-	{#if onRemove}
-		<button class="remove-btn" onclick={() => onRemove(item.id)} aria-label={t.panProject.removeItem}>
-			<i class="ri-close-line"></i>
-		</button>
+<!-- svelte-ignore a11y_click_events_have_key_events -->
+<!-- svelte-ignore a11y_no_static_element_interactions -->
+<div
+	class="pan-item-card"
+	class:selected-card={selectMode && selected}
+	onclick={selectMode ? () => onSelect?.(item.id) : undefined}
+>
+	{#if selectMode}
+		<div class="select-overlay">
+			<SelectableCheckbox checked={selected} onToggle={() => onSelect?.(item.id)} />
+		</div>
+	{:else}
+		{#if onEdit}
+			<button class="edit-btn" onclick={() => onEdit(item.id)} aria-label={t.panProject.editQuantity}>
+				<i class="ri-pencil-line"></i>
+			</button>
+		{/if}
+		{#if onRemove}
+			<button class="remove-btn" onclick={() => onRemove(item.id)} aria-label={t.panProject.removeItem}>
+				<i class="ri-close-line"></i>
+			</button>
+		{/if}
 	{/if}
 
 	<div class="card-header">
@@ -93,6 +112,18 @@
 
 	.pan-item-card:active {
 		transform: scale(0.98);
+	}
+
+	.pan-item-card.selected-card {
+		border-color: var(--accent-pink);
+		box-shadow: 0 0 0 2px rgba(233, 30, 99, 0.15);
+	}
+
+	.select-overlay {
+		position: absolute;
+		top: 12px;
+		right: 12px;
+		z-index: 2;
 	}
 
 	.edit-btn {

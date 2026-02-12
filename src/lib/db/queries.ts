@@ -1508,17 +1508,6 @@ export interface DeclutterBreakdown {
 	total_recovered: number;
 }
 
-export interface DeclutterCandidate {
-	id: number;
-	name: string;
-	category_id: number;
-	category_name: string;
-	category_icon: string;
-	subcategory_name?: string;
-	purchase_price: number | null;
-	usage_count: number;
-}
-
 export interface DeclutteredItem {
 	id: number;
 	item_id: number;
@@ -1532,7 +1521,6 @@ export interface DeclutteredItem {
 }
 
 export interface DeclutterPageData {
-	candidates: DeclutterCandidate[];
 	decluttered: DeclutteredItem[];
 	stats: DeclutterBreakdown;
 }
@@ -1540,18 +1528,6 @@ export interface DeclutterPageData {
 export async function loadDeclutterPageData(userId: number): Promise<DeclutterPageData> {
 	const db = getDb();
 	const results = await db.batch([
-		{
-			sql: `SELECT i.id, i.name, i.category_id, i.purchase_price,
-			c.name as category_name, c.icon as category_icon,
-			sc.name as subcategory_name,
-			(SELECT COUNT(*) FROM usage_log ul WHERE ul.item_id = i.id) as usage_count
-			FROM items i
-			JOIN categories c ON i.category_id = c.id
-			LEFT JOIN subcategories sc ON i.subcategory_id = sc.id
-			WHERE i.status = 'active' AND i.user_id = ?
-			ORDER BY c.name, i.name`,
-			args: [userId]
-		},
 		{
 			sql: `SELECT dl.id, dl.item_id, dl.method, dl.reason, dl.amount_recovered, dl.created_at,
 			i.name as item_name, c.name as category_name, c.icon as category_icon
@@ -1574,18 +1550,7 @@ export async function loadDeclutterPageData(userId: number): Promise<DeclutterPa
 		}
 	], 'read');
 
-	const candidates: DeclutterCandidate[] = results[0].rows.map(r => ({
-		id: r.id as number,
-		name: r.name as string,
-		category_id: r.category_id as number,
-		category_name: r.category_name as string,
-		category_icon: r.category_icon as string,
-		subcategory_name: (r.subcategory_name as string) ?? undefined,
-		purchase_price: (r.purchase_price as number) ?? null,
-		usage_count: (r.usage_count as number) ?? 0
-	}));
-
-	const decluttered: DeclutteredItem[] = results[1].rows.map(r => ({
+	const decluttered: DeclutteredItem[] = results[0].rows.map(r => ({
 		id: r.id as number,
 		item_id: r.item_id as number,
 		item_name: r.item_name as string,
@@ -1597,7 +1562,7 @@ export async function loadDeclutterPageData(userId: number): Promise<DeclutterPa
 		category_icon: r.category_icon as string
 	}));
 
-	const s = results[2].rows[0];
+	const s = results[1].rows[0];
 	const stats: DeclutterBreakdown = {
 		donated: (s.donated as number) ?? 0,
 		sold: (s.sold as number) ?? 0,
@@ -1606,7 +1571,7 @@ export async function loadDeclutterPageData(userId: number): Promise<DeclutterPa
 		total_recovered: (s.total_recovered as number) ?? 0
 	};
 
-	return { candidates, decluttered, stats };
+	return { decluttered, stats };
 }
 
 export interface ProgressData {
@@ -2121,4 +2086,59 @@ export async function updatePanItem(userId: number, id: number, quantity: number
 		sql: 'UPDATE pan_project_items SET quantity = ? WHERE id = ? AND user_id = ?',
 		args: [quantity, id, userId]
 	});
+}
+
+// --- Bulk Delete Operations ---
+
+export async function deleteItems(userId: number, ids: number[]): Promise<void> {
+	if (ids.length === 0) return;
+	const db = getDb();
+	const placeholders = ids.map(() => '?').join(',');
+	const args = [...ids, userId];
+	// Cascade: usage_log, declutter_log, pan_project_items, purchases→NULL
+	await db.execute({ sql: `DELETE FROM usage_log WHERE item_id IN (${placeholders}) AND user_id = ?`, args });
+	await db.execute({ sql: `DELETE FROM declutter_log WHERE item_id IN (${placeholders}) AND user_id = ?`, args });
+	await db.execute({ sql: `DELETE FROM pan_project_items WHERE item_id IN (${placeholders}) AND user_id = ?`, args });
+	await db.execute({ sql: `UPDATE purchases SET item_id = NULL WHERE item_id IN (${placeholders}) AND user_id = ?`, args });
+	await db.execute({ sql: `DELETE FROM items WHERE id IN (${placeholders}) AND user_id = ?`, args });
+}
+
+export async function deleteShoppingItems(userId: number, ids: number[]): Promise<void> {
+	if (ids.length === 0) return;
+	const db = getDb();
+	const placeholders = ids.map(() => '?').join(',');
+	await db.execute({ sql: `DELETE FROM shopping_list WHERE id IN (${placeholders}) AND user_id = ?`, args: [...ids, userId] });
+}
+
+export async function removePanItems(userId: number, ids: number[]): Promise<void> {
+	if (ids.length === 0) return;
+	const db = getDb();
+	const placeholders = ids.map(() => '?').join(',');
+	await db.execute({ sql: `DELETE FROM pan_project_items WHERE id IN (${placeholders}) AND user_id = ?`, args: [...ids, userId] });
+}
+
+export async function deleteBudgets(userId: number, ids: number[]): Promise<void> {
+	if (ids.length === 0) return;
+	const db = getDb();
+	const placeholders = ids.map(() => '?').join(',');
+	await db.execute({ sql: `DELETE FROM budgets WHERE id IN (${placeholders}) AND user_id = ?`, args: [...ids, userId] });
+}
+
+export async function deletePurchases(userId: number, ids: number[]): Promise<void> {
+	if (ids.length === 0) return;
+	const db = getDb();
+	const placeholders = ids.map(() => '?').join(',');
+	await db.execute({ sql: `DELETE FROM purchases WHERE id IN (${placeholders}) AND user_id = ?`, args: [...ids, userId] });
+}
+
+export async function deleteDeclutterLogEntry(userId: number, id: number): Promise<void> {
+	const db = getDb();
+	await db.execute({ sql: 'DELETE FROM declutter_log WHERE id = ? AND user_id = ?', args: [id, userId] });
+}
+
+export async function deleteDeclutterLogEntries(userId: number, ids: number[]): Promise<void> {
+	if (ids.length === 0) return;
+	const db = getDb();
+	const placeholders = ids.map(() => '?').join(',');
+	await db.execute({ sql: `DELETE FROM declutter_log WHERE id IN (${placeholders}) AND user_id = ?`, args: [...ids, userId] });
 }

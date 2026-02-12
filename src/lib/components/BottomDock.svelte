@@ -21,7 +21,7 @@
 	const addButtonMap: Record<string, ModalType> = {
 		'/inventory': 'add-item',
 		'/pan-project': 'inventory-picker-pan',
-		'/budget': 'add-budget',
+		'/budget': 'add-purchase',
 		'/declutter': 'inventory-picker-declutter',
 		'/shopping': 'add-shopping-item',
 	};

@@ -3,7 +3,9 @@
     import SectionTitle from '$lib/components/SectionTitle.svelte';
     import ProgressRing from '$lib/components/ProgressRing.svelte';
     import PanItemCard from '$lib/components/PanItemCard.svelte';
-    import { getPanItems, getPanProjectStats, markPanItemEmptied, removePanItem, updatePanItem, type PanProjectItem, type PanProjectStats } from '$lib/db/queries';
+    import SelectModeButton from '$lib/components/SelectModeButton.svelte';
+    import SelectionBar from '$lib/components/SelectionBar.svelte';
+    import { getPanItems, getPanProjectStats, markPanItemEmptied, removePanItem, removePanItems, updatePanItem, type PanProjectItem, type PanProjectStats } from '$lib/db/queries';
     import { getAuthState } from '$lib/stores/auth.svelte';
     import { getRefreshSignal, triggerRefresh } from '$lib/stores/refresh.svelte';
     import { t } from '$lib/i18n/index.svelte';
@@ -18,6 +20,46 @@
     let editingId: number | null = $state(null);
     let editQuantity = $state(1);
     let saving = $state(false);
+
+    // Select mode
+    let selectMode = $state(false);
+    let selectedIds = $state(new Set<number>());
+    let deletingSelected = $state(false);
+
+    function toggleSelectMode() {
+        selectMode = !selectMode;
+        selectedIds = new Set();
+    }
+
+    function toggleSelection(id: number) {
+        const next = new Set(selectedIds);
+        if (next.has(id)) next.delete(id); else next.add(id);
+        selectedIds = next;
+    }
+
+    function selectAll() {
+        selectedIds = new Set(items.map(i => i.id));
+    }
+
+    function deselectAll() {
+        selectedIds = new Set();
+    }
+
+    async function handleDeleteSelected() {
+        const userId = auth.currentUser?.id;
+        if (!userId || selectedIds.size === 0) return;
+        if (!confirm(t.common.confirmDeleteMultiple)) return;
+        deletingSelected = true;
+        try {
+            await removePanItems(userId, [...selectedIds]);
+            selectedIds = new Set();
+            selectMode = false;
+            triggerRefresh();
+            await loadData();
+        } finally {
+            deletingSelected = false;
+        }
+    }
 
     let completionPct = $derived(
         stats && stats.total > 0 ? Math.round((stats.emptied / stats.total) * 100) : 0
@@ -84,6 +126,9 @@
 
 <header class="page-header">
     <h1 class="page-title">{t.panProject.title}</h1>
+    {#if items.length > 0}
+        <SelectModeButton active={selectMode} onToggle={toggleSelectMode} />
+    {/if}
 </header>
 
 <main>
@@ -121,9 +166,12 @@
             {#each items as item (item.id)}
                 <PanItemCard
                     {item}
-                    onMarkEmptied={handleMarkEmptied}
-                    onRemove={handleRemove}
-                    onEdit={startEdit}
+                    onMarkEmptied={selectMode ? undefined : handleMarkEmptied}
+                    onRemove={selectMode ? undefined : handleRemove}
+                    onEdit={selectMode ? undefined : startEdit}
+                    {selectMode}
+                    selected={selectedIds.has(item.id)}
+                    onSelect={toggleSelection}
                 />
             {/each}
 
@@ -161,11 +209,20 @@
     {/if}
 </main>
 
+<SelectionBar
+    selectedCount={selectedIds.size}
+    totalCount={items.length}
+    onSelectAll={selectAll}
+    onDeselectAll={deselectAll}
+    onDeleteSelected={handleDeleteSelected}
+    deleting={deletingSelected}
+/>
+
 <style>
     .page-header {
         display: flex;
         align-items: center;
-        justify-content: center;
+        justify-content: space-between;
         padding: 20px 24px;
     }
     .page-title {

@@ -3,6 +3,7 @@
 	import BottomDock from '$lib/components/BottomDock.svelte';
 	import AddItemSheet from '$lib/components/AddItemSheet.svelte';
 	import AddBudgetSheet from '$lib/components/AddBudgetSheet.svelte';
+	import AddPurchaseSheet from '$lib/components/AddPurchaseSheet.svelte';
 	import AddShoppingItemSheet from '$lib/components/AddShoppingItemSheet.svelte';
 	import InventoryPickerSheet from '$lib/components/InventoryPickerSheet.svelte';
 	import LoginForm from '$lib/components/LoginForm.svelte';
@@ -55,6 +56,8 @@
 			<AddItemSheet />
 		{:else if modal.current === 'add-budget'}
 			<AddBudgetSheet />
+		{:else if modal.current === 'add-purchase'}
+			<AddPurchaseSheet />
 		{:else if modal.current === 'add-shopping-item'}
 			<AddShoppingItemSheet />
 		{:else if modal.current === 'inventory-picker-pan'}

@@ -7,26 +7,42 @@
         notes: string | null;
     }
 
+    import SelectableCheckbox from './SelectableCheckbox.svelte';
+
     interface Props {
         item: ShoppingItem;
         onToggle?: (id: number) => void;
         onDelete?: (id: number) => void;
         onEdit?: (id: number) => void;
+        selectMode?: boolean;
+        selected?: boolean;
+        onSelect?: (id: number) => void;
     }
 
-    let { item, onToggle, onDelete, onEdit }: Props = $props();
+    let { item, onToggle, onDelete, onEdit, selectMode = false, selected = false, onSelect }: Props = $props();
 
     let isChecked = $derived(item.checked === 1);
 </script>
 
-<div class="shopping-row" class:checked={isChecked}>
-    <button class="checkbox-area" onclick={() => onToggle?.(item.id)} aria-label="Toggle {item.name}">
-        <span class="checkbox" class:checked={isChecked}>
-            {#if isChecked}
-                <i class="ri-check-line"></i>
-            {/if}
-        </span>
-    </button>
+<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+<div
+    class="shopping-row"
+    class:checked={isChecked}
+    onclick={selectMode ? () => onSelect?.(item.id) : undefined}
+    role={selectMode ? 'button' : undefined}
+    tabindex={selectMode ? 0 : undefined}
+>
+    {#if selectMode}
+        <SelectableCheckbox checked={selected} onToggle={() => onSelect?.(item.id)} />
+    {:else}
+        <button class="checkbox-area" onclick={() => onToggle?.(item.id)} aria-label="Toggle {item.name}">
+            <span class="checkbox" class:checked={isChecked}>
+                {#if isChecked}
+                    <i class="ri-check-line"></i>
+                {/if}
+            </span>
+        </button>
+    {/if}
 
     <div class="item-content">
         <div class="item-top">
@@ -40,14 +56,16 @@
         {/if}
     </div>
 
-    {#if onEdit}
-        <button class="delete-btn" onclick={() => onEdit?.(item.id)} aria-label="Edit {item.name}">
-            <i class="ri-pencil-line"></i>
+    {#if !selectMode}
+        {#if onEdit}
+            <button class="delete-btn" onclick={() => onEdit?.(item.id)} aria-label="Edit {item.name}">
+                <i class="ri-pencil-line"></i>
+            </button>
+        {/if}
+        <button class="delete-btn" onclick={() => onDelete?.(item.id)} aria-label="Delete {item.name}">
+            <i class="ri-delete-bin-6-line"></i>
         </button>
     {/if}
-    <button class="delete-btn" onclick={() => onDelete?.(item.id)} aria-label="Delete {item.name}">
-        <i class="ri-delete-bin-6-line"></i>
-    </button>
 </div>
 
 <style>

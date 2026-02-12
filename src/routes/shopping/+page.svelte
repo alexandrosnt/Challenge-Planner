@@ -1,7 +1,9 @@
 <script lang="ts">
     import GlassCard from '$lib/components/GlassCard.svelte';
     import ShoppingListItem from '$lib/components/ShoppingListItem.svelte';
-    import { getShoppingList, toggleShoppingItem, deleteShoppingItem, clearCheckedShoppingItems, updateShoppingItem, type ShoppingItem } from '$lib/db/queries';
+    import SelectModeButton from '$lib/components/SelectModeButton.svelte';
+    import SelectionBar from '$lib/components/SelectionBar.svelte';
+    import { getShoppingList, toggleShoppingItem, deleteShoppingItem, clearCheckedShoppingItems, updateShoppingItem, deleteShoppingItems, type ShoppingItem } from '$lib/db/queries';
     import { getAuthState } from '$lib/stores/auth.svelte';
     import { getRefreshSignal, triggerRefresh } from '$lib/stores/refresh.svelte';
     import { t } from '$lib/i18n/index.svelte';
@@ -12,14 +14,64 @@
     let items = $state<ShoppingItem[]>([]);
     let loading = $state(true);
 
+    // Select mode
+    let selectMode = $state(false);
+    let selectedIds = $state(new Set<number>());
+    let deleting = $state(false);
+
+    function toggleSelectMode() {
+        selectMode = !selectMode;
+        selectedIds = new Set();
+    }
+
+    function toggleSelection(id: number) {
+        const next = new Set(selectedIds);
+        if (next.has(id)) next.delete(id); else next.add(id);
+        selectedIds = next;
+    }
+
+    function selectAll() {
+        selectedIds = new Set(items.map(i => i.id));
+    }
+
+    function deselectAll() {
+        selectedIds = new Set();
+    }
+
+    async function handleDeleteSelected() {
+        const userId = auth.currentUser?.id;
+        if (!userId || selectedIds.size === 0) return;
+        if (!confirm(t.common.confirmDeleteMultiple)) return;
+        deleting = true;
+        try {
+            await deleteShoppingItems(userId, [...selectedIds]);
+            selectedIds = new Set();
+            selectMode = false;
+            triggerRefresh();
+            await loadData();
+        } finally {
+            deleting = false;
+        }
+    }
+
     let editingId: number | null = $state(null);
     let editName = $state('');
     let editQuantity = $state(1);
     let editNotes = $state('');
     let saving = $state(false);
+    let searchQuery = $state('');
 
-    let uncheckedItems = $derived(items.filter(i => !i.checked));
-    let checkedItems = $derived(items.filter(i => i.checked));
+    let filteredItems = $derived.by(() => {
+        if (!searchQuery.trim()) return items;
+        const q = searchQuery.trim().toLowerCase();
+        return items.filter(i =>
+            i.name.toLowerCase().includes(q) ||
+            (i.notes?.toLowerCase().includes(q))
+        );
+    });
+
+    let uncheckedItems = $derived(filteredItems.filter(i => !i.checked));
+    let checkedItems = $derived(filteredItems.filter(i => i.checked));
     let hasChecked = $derived(checkedItems.length > 0);
 
     async function loadData() {
@@ -99,15 +151,38 @@
 
 <header class="page-header">
     <h1 class="page-title">{t.shoppingList.title}</h1>
-    {#if hasChecked}
-        <button class="clear-btn" onclick={handleClearChecked}>
-            <i class="ri-delete-bin-line"></i>
-            {t.shoppingList.clearChecked}
-        </button>
-    {/if}
+    <div class="header-actions">
+        {#if hasChecked && !selectMode}
+            <button class="clear-btn" onclick={handleClearChecked}>
+                <i class="ri-delete-bin-line"></i>
+                {t.shoppingList.clearChecked}
+            </button>
+        {/if}
+        {#if items.length > 0}
+            <SelectModeButton active={selectMode} onToggle={toggleSelectMode} />
+        {/if}
+    </div>
 </header>
 
 <main>
+    <!-- Search -->
+    {#if items.length > 0}
+        <div class="search-bar">
+            <i class="ri-search-line search-icon"></i>
+            <input
+                class="search-input"
+                type="text"
+                placeholder={t.shoppingList.searchPlaceholder}
+                bind:value={searchQuery}
+            />
+            {#if searchQuery}
+                <button class="search-clear" onclick={() => searchQuery = ''}>
+                    <i class="ri-close-line"></i>
+                </button>
+            {/if}
+        </div>
+    {/if}
+
     {#if loading}
         <GlassCard>
             {#each Array(4) as _, i (i)}
@@ -134,6 +209,9 @@
                         onToggle={handleToggle}
                         onDelete={handleDelete}
                         onEdit={startEdit}
+                        {selectMode}
+                        selected={selectedIds.has(item.id)}
+                        onSelect={toggleSelection}
                     />
                 {/each}
             </GlassCard>
@@ -151,6 +229,9 @@
                         onToggle={handleToggle}
                         onDelete={handleDelete}
                         onEdit={startEdit}
+                        {selectMode}
+                        selected={selectedIds.has(item.id)}
+                        onSelect={toggleSelection}
                     />
                 {/each}
             </GlassCard>
@@ -202,6 +283,15 @@
     {/if}
 </main>
 
+<SelectionBar
+    selectedCount={selectedIds.size}
+    totalCount={items.length}
+    onSelectAll={selectAll}
+    onDeselectAll={deselectAll}
+    onDeleteSelected={handleDeleteSelected}
+    {deleting}
+/>
+
 <style>
     .page-header {
         display: flex;
@@ -214,6 +304,56 @@
         font-weight: 700;
         color: var(--text-dark);
         letter-spacing: -0.3px;
+    }
+    .header-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .search-bar {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 14px;
+        background: white;
+        border: 1px solid rgba(0, 0, 0, 0.06);
+        border-radius: 50px;
+        margin-bottom: 14px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    }
+    .search-icon {
+        font-size: 18px;
+        color: var(--text-soft);
+        flex-shrink: 0;
+    }
+    .search-input {
+        flex: 1;
+        border: none;
+        outline: none;
+        background: transparent;
+        font-family: 'Poppins', sans-serif;
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--text-dark);
+    }
+    .search-input::placeholder {
+        color: var(--text-soft);
+        font-weight: 400;
+    }
+    .search-clear {
+        flex-shrink: 0;
+        background: none;
+        border: none;
+        padding: 2px;
+        cursor: pointer;
+        color: var(--text-soft);
+        font-size: 18px;
+        display: flex;
+        align-items: center;
+        -webkit-tap-highlight-color: transparent;
+    }
+    .search-clear:active {
+        color: var(--accent-pink);
     }
     .clear-btn {
         display: flex;

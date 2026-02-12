@@ -1,10 +1,13 @@
 <script>
     import SubcategoryPills from '$lib/components/SubcategoryPills.svelte';
     import ItemDetailSheet from '$lib/components/ItemDetailSheet.svelte';
-    import { getCategories, getSubcategories, getItems } from '$lib/db/queries';
+    import SelectModeButton from '$lib/components/SelectModeButton.svelte';
+    import SelectionBar from '$lib/components/SelectionBar.svelte';
+    import SelectableCheckbox from '$lib/components/SelectableCheckbox.svelte';
+    import { getCategories, getSubcategories, getItems, deleteItem, deleteItems } from '$lib/db/queries';
     import { getAuthState } from '$lib/stores/auth.svelte';
     import { dragscroll } from '$lib/actions/dragscroll';
-    import { getRefreshSignal } from '$lib/stores/refresh.svelte';
+    import { getRefreshSignal, triggerRefresh } from '$lib/stores/refresh.svelte';
     import { t } from '$lib/i18n/index.svelte';
 
     let auth = getAuthState();
@@ -20,11 +23,73 @@
     let selectedSubcategoryId = $state(0);
     let refresh = getRefreshSignal();
     let selectedStatus = $state('all');
+    let searchQuery = $state('');
     /** @type {import('$lib/db/queries').Item | null} */
     let selectedItem = $state(null);
 
+    // Select mode
+    let selectMode = $state(false);
+    /** @type {Set<number>} */
+    let selectedIds = $state(new Set());
+    let deletingSelected = $state(false);
+
+    function toggleSelectMode() {
+        selectMode = !selectMode;
+        selectedIds = new Set();
+    }
+
+    /** @param {number} id */
+    function toggleSelection(id) {
+        const next = new Set(selectedIds);
+        if (next.has(id)) next.delete(id); else next.add(id);
+        selectedIds = next;
+    }
+
+    function selectAllItems() {
+        selectedIds = new Set(filteredItems.map(i => i.id));
+    }
+
+    function deselectAllItems() {
+        selectedIds = new Set();
+    }
+
+    async function handleDeleteSelected() {
+        const userId = auth.currentUser?.id;
+        if (!userId || selectedIds.size === 0) return;
+        if (!confirm(t.common.confirmDeleteMultiple)) return;
+        deletingSelected = true;
+        try {
+            await deleteItems(userId, [...selectedIds]);
+            selectedIds = new Set();
+            selectMode = false;
+            triggerRefresh();
+            await loadData();
+        } finally {
+            deletingSelected = false;
+        }
+    }
+
+    /** @param {Event} e @param {number} id */
+    async function handleInlineDelete(e, id) {
+        e.stopPropagation();
+        const userId = auth.currentUser?.id;
+        if (!userId) return;
+        if (!confirm(t.itemDetail.deleteConfirm)) return;
+        await deleteItem(userId, id);
+        triggerRefresh();
+        await loadData();
+    }
+
     let filteredItems = $derived.by(() => {
         let result = items;
+        if (searchQuery.trim()) {
+            const q = searchQuery.trim().toLowerCase();
+            result = result.filter(i =>
+                i.name.toLowerCase().includes(q) ||
+                (i.category_name?.toLowerCase().includes(q)) ||
+                (i.subcategory_name?.toLowerCase().includes(q))
+            );
+        }
         if (selectedCategoryId > 0) {
             result = result.filter(i => i.category_id === selectedCategoryId);
         }
@@ -97,9 +162,28 @@
         <p style="font-size: 14px; color: var(--text-soft); font-weight: 500;">{t.inventory.yourProducts}</p>
         <h1 style="font-size: 26px; font-weight: 700; letter-spacing: -0.5px;">{t.inventory.title}</h1>
     </div>
+    {#if items.length > 0}
+        <SelectModeButton active={selectMode} onToggle={toggleSelectMode} />
+    {/if}
 </header>
 
 <main>
+    <!-- Search -->
+    <div class="search-bar">
+        <i class="ri-search-line search-icon"></i>
+        <input
+            class="search-input"
+            type="text"
+            placeholder={t.inventory.searchPlaceholder}
+            bind:value={searchQuery}
+        />
+        {#if searchQuery}
+            <button class="search-clear" onclick={() => searchQuery = ''}>
+                <i class="ri-close-line"></i>
+            </button>
+        {/if}
+    </div>
+
     <!-- Category Filter -->
     <div class="filter-scroll" use:dragscroll>
         <button class="filter-pill" class:active={selectedCategoryId === 0} onclick={() => handleCategorySelect(0)}>
@@ -153,31 +237,67 @@
     {:else}
         <div class="items-list">
             {#each filteredItems as item (item.id)}
-                <button class="list-item-btn" onclick={() => handleItemClick(item)}>
-                    <div class="list-item">
-                        <div class="list-item-icon">
-                            <i class={item.category_icon ?? 'ri-box-3-line'}></i>
-                        </div>
-                        <div class="list-item-info">
-                            <h3 class="list-item-name">{item.name}</h3>
-                            <span class="list-item-sub">{item.subcategory_name || item.category_name}</span>
-                        </div>
-                        <div class="list-item-right">
-                            <span class="list-status-badge" class:status-active={item.status === 'active'} class:status-finished={item.status === 'used_up'} class:status-decluttered={item.status === 'decluttered'}>
-                                {#if item.status === 'active'}
-                                    {t.common.active}
-                                {:else if item.status === 'used_up'}
-                                    {t.common.finished}
-                                {:else}
-                                    {t.common.decluttered}
+                {#if selectMode}
+                    <!-- svelte-ignore a11y_click_events_have_key_events -->
+                    <!-- svelte-ignore a11y_no_static_element_interactions -->
+                    <div class="list-item-btn" onclick={() => toggleSelection(item.id)}>
+                        <div class="list-item" class:selected-item={selectedIds.has(item.id)}>
+                            <SelectableCheckbox checked={selectedIds.has(item.id)} onToggle={() => toggleSelection(item.id)} />
+                            <div class="list-item-icon">
+                                <i class={item.category_icon ?? 'ri-box-3-line'}></i>
+                            </div>
+                            <div class="list-item-info">
+                                <h3 class="list-item-name">{item.name}</h3>
+                                <span class="list-item-sub">{item.subcategory_name || item.category_name}</span>
+                            </div>
+                            <div class="list-item-right">
+                                <span class="list-status-badge" class:status-active={item.status === 'active'} class:status-finished={item.status === 'used_up'} class:status-decluttered={item.status === 'decluttered'}>
+                                    {#if item.status === 'active'}
+                                        {t.common.active}
+                                    {:else if item.status === 'used_up'}
+                                        {t.common.finished}
+                                    {:else}
+                                        {t.common.decluttered}
+                                    {/if}
+                                </span>
+                                {#if (item.usage_count ?? 0) > 0}
+                                    <span class="list-usage">{item.usage_count}x</span>
                                 {/if}
-                            </span>
-                            {#if (item.usage_count ?? 0) > 0}
-                                <span class="list-usage">{item.usage_count}x</span>
-                            {/if}
+                            </div>
                         </div>
                     </div>
-                </button>
+                {:else}
+                    <!-- svelte-ignore a11y_click_events_have_key_events -->
+                    <!-- svelte-ignore a11y_no_static_element_interactions -->
+                    <div class="list-item-btn" onclick={() => handleItemClick(item)}>
+                        <div class="list-item">
+                            <div class="list-item-icon">
+                                <i class={item.category_icon ?? 'ri-box-3-line'}></i>
+                            </div>
+                            <div class="list-item-info">
+                                <h3 class="list-item-name">{item.name}</h3>
+                                <span class="list-item-sub">{item.subcategory_name || item.category_name}</span>
+                            </div>
+                            <div class="list-item-right">
+                                <button class="inline-delete-btn" onclick={(e) => handleInlineDelete(e, item.id)} aria-label={t.inventory.deleteItem}>
+                                    <i class="ri-delete-bin-6-line"></i>
+                                </button>
+                                <span class="list-status-badge" class:status-active={item.status === 'active'} class:status-finished={item.status === 'used_up'} class:status-decluttered={item.status === 'decluttered'}>
+                                    {#if item.status === 'active'}
+                                        {t.common.active}
+                                    {:else if item.status === 'used_up'}
+                                        {t.common.finished}
+                                    {:else}
+                                        {t.common.decluttered}
+                                    {/if}
+                                </span>
+                                {#if (item.usage_count ?? 0) > 0}
+                                    <span class="list-usage">{item.usage_count}x</span>
+                                {/if}
+                            </div>
+                        </div>
+                    </div>
+                {/if}
             {:else}
                 <div class="empty-state">
                     <i class="ri-inbox-line"></i>
@@ -190,12 +310,66 @@
 
 <ItemDetailSheet item={selectedItem} onClose={handleDetailClose} />
 
+<SelectionBar
+    selectedCount={selectedIds.size}
+    totalCount={filteredItems.length}
+    onSelectAll={selectAllItems}
+    onDeselectAll={deselectAllItems}
+    onDeleteSelected={handleDeleteSelected}
+    deleting={deletingSelected}
+/>
+
 <style>
     .inv-header {
         padding: 20px 24px;
         display: flex;
         align-items: center;
         justify-content: space-between;
+    }
+    .search-bar {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 14px;
+        background: white;
+        border: 1px solid rgba(0, 0, 0, 0.06);
+        border-radius: 50px;
+        margin-bottom: 14px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    }
+    .search-icon {
+        font-size: 18px;
+        color: var(--text-soft);
+        flex-shrink: 0;
+    }
+    .search-input {
+        flex: 1;
+        border: none;
+        outline: none;
+        background: transparent;
+        font-family: 'Poppins', sans-serif;
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--text-dark);
+    }
+    .search-input::placeholder {
+        color: var(--text-soft);
+        font-weight: 400;
+    }
+    .search-clear {
+        flex-shrink: 0;
+        background: none;
+        border: none;
+        padding: 2px;
+        cursor: pointer;
+        color: var(--text-soft);
+        font-size: 18px;
+        display: flex;
+        align-items: center;
+        -webkit-tap-highlight-color: transparent;
+    }
+    .search-clear:active {
+        color: var(--accent-pink);
     }
     .filter-scroll {
         display: flex;
@@ -293,6 +467,9 @@
         cursor: pointer;
         width: 100%;
     }
+    div.list-item-btn {
+        -webkit-tap-highlight-color: transparent;
+    }
     .list-item {
         display: flex;
         align-items: center;
@@ -354,5 +531,25 @@
     }
     .list-usage {
         font-size: 11px; font-weight: 700; color: var(--accent-pink);
+    }
+    .list-item.selected-item {
+        border-color: var(--accent-pink);
+        box-shadow: 0 0 0 2px rgba(233, 30, 99, 0.15);
+    }
+    .inline-delete-btn {
+        background: none;
+        border: none;
+        padding: 4px;
+        cursor: pointer;
+        color: var(--text-soft);
+        font-size: 16px;
+        transition: color 0.2s, transform 0.15s;
+        -webkit-tap-highlight-color: transparent;
+        display: flex;
+        align-items: center;
+    }
+    .inline-delete-btn:active {
+        color: var(--accent-pink);
+        transform: scale(0.85);
     }
 </style>

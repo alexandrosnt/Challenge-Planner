@@ -3,8 +3,11 @@
     import GlassCard from '$lib/components/GlassCard.svelte';
     import SectionTitle from '$lib/components/SectionTitle.svelte';
     import ProgressBar from '$lib/components/ProgressBar.svelte';
-    import { getBudgetWithSpending, getPurchases, getTotalSpentThisMonth, getCategories, updateBudget, deleteBudget, updatePurchase, deletePurchase, type Budget, type Purchase, type Category } from '$lib/db/queries';
+    import SelectModeButton from '$lib/components/SelectModeButton.svelte';
+    import SelectionBar from '$lib/components/SelectionBar.svelte';
+    import { getBudgetWithSpending, getPurchases, getTotalSpentThisMonth, getCategories, updateBudget, deleteBudget, deleteBudgets, updatePurchase, deletePurchase, deletePurchases, type Budget, type Purchase, type Category } from '$lib/db/queries';
     import { getAuthState } from '$lib/stores/auth.svelte';
+    import { openModal } from '$lib/stores/modal.svelte';
     import { t } from '$lib/i18n/index.svelte';
 
     let auth = getAuthState();
@@ -25,6 +28,93 @@
     let confirmDeleteId: number | null = $state(null);
     let saving: boolean = $state(false);
     let categories: Category[] = $state([]);
+
+    // Select mode
+    let selectMode = $state(false);
+    let selectedBudgetIds = $state(new Set<number>());
+    let selectedPurchaseIds = $state(new Set<number>());
+    let deletingSelected = $state(false);
+
+    let selectionCount = $derived(selectedBudgetIds.size + selectedPurchaseIds.size);
+    let selectionTotal = $derived(budgets.length + purchases.length);
+
+    function toggleSelectMode() {
+        selectMode = !selectMode;
+        selectedBudgetIds = new Set();
+        selectedPurchaseIds = new Set();
+    }
+
+    function toggleBudgetSelection(id: number) {
+        const next = new Set(selectedBudgetIds);
+        if (next.has(id)) next.delete(id); else next.add(id);
+        selectedBudgetIds = next;
+    }
+
+    function togglePurchaseSelection(id: number) {
+        const next = new Set(selectedPurchaseIds);
+        if (next.has(id)) next.delete(id); else next.add(id);
+        selectedPurchaseIds = next;
+    }
+
+    function selectAllBudgetItems() {
+        selectedBudgetIds = new Set(budgets.map(b => b.id));
+        selectedPurchaseIds = new Set(purchases.map(p => p.id));
+    }
+
+    function deselectAllBudgetItems() {
+        selectedBudgetIds = new Set();
+        selectedPurchaseIds = new Set();
+    }
+
+    async function handleDeleteSelectedBudgetItems() {
+        const userId = auth.currentUser?.id;
+        if (!userId || selectionCount === 0) return;
+        if (!confirm(t.common.confirmDeleteMultiple)) return;
+        deletingSelected = true;
+        try {
+            if (selectedBudgetIds.size > 0) {
+                await deleteBudgets(userId, [...selectedBudgetIds]);
+            }
+            if (selectedPurchaseIds.size > 0) {
+                await deletePurchases(userId, [...selectedPurchaseIds]);
+            }
+            selectedBudgetIds = new Set();
+            selectedPurchaseIds = new Set();
+            selectMode = false;
+            triggerRefresh();
+            await loadData();
+        } finally {
+            deletingSelected = false;
+        }
+    }
+
+    async function handleInlineDeleteBudget(e: Event, id: number) {
+        e.stopPropagation();
+        if (confirmDeleteId !== id) {
+            confirmDeleteId = id;
+            return;
+        }
+        const userId = auth.currentUser?.id;
+        if (!userId) return;
+        await deleteBudget(userId, id);
+        confirmDeleteId = null;
+        triggerRefresh();
+        await loadData();
+    }
+
+    async function handleInlineDeletePurchase(e: Event, id: number) {
+        e.stopPropagation();
+        if (confirmDeletePurchaseId !== id) {
+            confirmDeletePurchaseId = id;
+            return;
+        }
+        const userId = auth.currentUser?.id;
+        if (!userId) return;
+        await deletePurchase(userId, id);
+        confirmDeletePurchaseId = null;
+        triggerRefresh();
+        await loadData();
+    }
 
     let totalLimit = $derived(budgets.reduce((sum, b) => sum + b.monthly_limit, 0));
     let budgetPct = $derived(totalLimit > 0 ? Math.round((totalSpent / totalLimit) * 100) : 0);
@@ -193,6 +283,15 @@
 
 <header class="page-header">
     <h1 class="page-title">{t.budgetPage.title}</h1>
+    <div class="header-actions">
+        <button class="add-budget-btn" onclick={() => openModal('add-budget')}>
+            <i class="ri-add-line"></i>
+            {t.budgetPage.addBudget}
+        </button>
+        {#if budgets.length > 0 || purchases.length > 0}
+            <SelectModeButton active={selectMode} onToggle={toggleSelectMode} />
+        {/if}
+    </div>
 </header>
 
 <main>
@@ -297,13 +396,24 @@
                     {:else}
                         <!-- svelte-ignore a11y_click_events_have_key_events -->
                         <!-- svelte-ignore a11y_no_static_element_interactions -->
-                        <div class="budget-row" onclick={() => startEdit(budget)}>
+                        <div class="budget-row" class:selected-row={selectMode && selectedBudgetIds.has(budget.id)} onclick={() => selectMode ? toggleBudgetSelection(budget.id) : startEdit(budget)}>
                             <div class="budget-header">
                                 <div class="budget-cat">
                                     <i class="{budget.category_icon ?? 'ri-wallet-3-line'} budget-icon"></i>
                                     <span class="budget-name">{budget.display_name}</span>
                                 </div>
-                                <span class="budget-limit">{formatCurrency(budget.monthly_limit)}</span>
+                                <div class="budget-header-actions">
+                                    {#if !selectMode}
+                                        <button class="inline-delete-btn" onclick={(e) => handleInlineDeleteBudget(e, budget.id)} aria-label={t.budgetPage.deleteBudget}>
+                                            {#if confirmDeleteId === budget.id}
+                                                <i class="ri-check-line" style="color: var(--accent-pink);"></i>
+                                            {:else}
+                                                <i class="ri-delete-bin-6-line"></i>
+                                            {/if}
+                                        </button>
+                                    {/if}
+                                    <span class="budget-limit">{formatCurrency(budget.monthly_limit)}</span>
+                                </div>
                             </div>
                             <ProgressBar
                                 value={Math.min(pct, 100)}
@@ -377,12 +487,23 @@
                     {:else}
                         <!-- svelte-ignore a11y_click_events_have_key_events -->
                         <!-- svelte-ignore a11y_no_static_element_interactions -->
-                        <div class="purchase-row" onclick={() => startEditPurchase(purchase)}>
+                        <div class="purchase-row" class:selected-row={selectMode && selectedPurchaseIds.has(purchase.id)} onclick={() => selectMode ? togglePurchaseSelection(purchase.id) : startEditPurchase(purchase)}>
                             <div class="purchase-info">
                                 <span class="purchase-name">{purchase.name}</span>
                                 <span class="purchase-meta">{purchase.category_name} &middot; {purchase.purchase_date}</span>
                             </div>
-                            <span class="purchase-amount">-{formatCurrency(purchase.amount)}</span>
+                            <div class="purchase-right">
+                                {#if !selectMode}
+                                    <button class="inline-delete-btn" onclick={(e) => handleInlineDeletePurchase(e, purchase.id)} aria-label={t.budgetPage.deletePurchase}>
+                                        {#if confirmDeletePurchaseId === purchase.id}
+                                            <i class="ri-check-line" style="color: var(--accent-pink);"></i>
+                                        {:else}
+                                            <i class="ri-delete-bin-6-line"></i>
+                                        {/if}
+                                    </button>
+                                {/if}
+                                <span class="purchase-amount">-{formatCurrency(purchase.amount)}</span>
+                            </div>
                         </div>
                     {/if}
                 {/each}
@@ -392,11 +513,20 @@
     {/if}
 </main>
 
+<SelectionBar
+    selectedCount={selectionCount}
+    totalCount={selectionTotal}
+    onSelectAll={selectAllBudgetItems}
+    onDeselectAll={deselectAllBudgetItems}
+    onDeleteSelected={handleDeleteSelectedBudgetItems}
+    deleting={deletingSelected}
+/>
+
 <style>
     .page-header {
         display: flex;
         align-items: center;
-        justify-content: center;
+        justify-content: space-between;
         padding: 20px 24px;
     }
     .page-title {
@@ -404,6 +534,34 @@
         font-weight: 700;
         color: var(--text-dark);
         letter-spacing: -0.3px;
+    }
+    .header-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .add-budget-btn {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        padding: 6px 12px;
+        border-radius: 50px;
+        border: 1px solid rgba(0, 0, 0, 0.06);
+        background: white;
+        font-family: 'Poppins', sans-serif;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--text-soft);
+        cursor: pointer;
+        transition: 0.2s;
+        -webkit-tap-highlight-color: transparent;
+    }
+    .add-budget-btn i {
+        font-size: 14px;
+    }
+    .add-budget-btn:active {
+        transform: scale(0.95);
+        background: #f5f5f5;
     }
     .overview-card {
         display: flex;
@@ -676,5 +834,36 @@
     .btn-delete:disabled {
         opacity: 0.5;
         cursor: not-allowed;
+    }
+    .budget-header-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .purchase-right {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-shrink: 0;
+    }
+    .inline-delete-btn {
+        background: none;
+        border: none;
+        padding: 4px;
+        cursor: pointer;
+        color: var(--text-soft);
+        font-size: 16px;
+        transition: color 0.2s, transform 0.15s;
+        -webkit-tap-highlight-color: transparent;
+        display: flex;
+        align-items: center;
+    }
+    .inline-delete-btn:active {
+        color: var(--accent-pink);
+        transform: scale(0.85);
+    }
+    .selected-row {
+        background: rgba(233, 30, 99, 0.04);
+        border-radius: 8px;
     }
 </style>

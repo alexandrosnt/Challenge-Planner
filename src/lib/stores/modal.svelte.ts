@@ -1,6 +1,7 @@
 export type ModalType =
 	| 'add-item'
 	| 'add-budget'
+	| 'add-purchase'
 	| 'add-shopping-item'
 	| 'inventory-picker-pan'
 	| 'inventory-picker-declutter'
