@@ -1,4 +1,5 @@
 import { createUser, getUserByEmail, getUserById, seedUserAchievements } from '$lib/db/queries';
+import { triggerSync } from '$lib/db/sync';
 import { t } from '$lib/i18n/index.svelte';
 
 let currentUser = $state<{ id: number; name: string; email: string } | null>(null);
@@ -71,6 +72,9 @@ export async function register(
 		currentUser = { id: userId, name, email };
 		isAuthenticated = true;
 		localStorage.setItem('useup_session', JSON.stringify({ email, userId }));
+
+		// Force immediate sync so account data reaches Turso
+		await triggerSync();
 
 		return { success: true };
 	} catch (e) {
