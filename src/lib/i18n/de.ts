@@ -176,6 +176,7 @@ const de = {
 		scanning: 'Scannen...',
 		lookingUp: 'Produkt wird gesucht...',
 		productNotFound: 'Produkt nicht gefunden, Barcode als Name eingetragen',
+		scanMobileOnly: 'Barcode-Scan erfordert ein Mobilgerät',
 		whatDidYouBuy: 'Was hast du gekauft?',
 		amount: 'Betrag',
 		addPurchase: 'Kauf hinzufügen',

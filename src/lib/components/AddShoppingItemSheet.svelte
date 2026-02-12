@@ -1,9 +1,11 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { addShoppingItem } from '$lib/db/queries';
 	import { getAuthState } from '$lib/stores/auth.svelte';
 	import { closeModal } from '$lib/stores/modal.svelte';
 	import { triggerRefresh } from '$lib/stores/refresh.svelte';
 	import { t } from '$lib/i18n/index.svelte';
+	import { lookupBarcode } from '$lib/api/openfoodfacts';
 
 	let { onAdded }: { onAdded?: () => void } = $props();
 
@@ -13,6 +15,63 @@
 	let quantity = $state(1);
 	let notes = $state('');
 	let submitting = $state(false);
+
+	let isMobile = $state(false);
+	let scanning = $state(false);
+	let lookingUp = $state(false);
+	let scanError = $state('');
+
+	onMount(async () => {
+		try {
+			const { platform } = await import('@tauri-apps/plugin-os');
+			const p = platform();
+			isMobile = p === 'android' || p === 'ios';
+		} catch {
+			isMobile = false;
+		}
+	});
+
+	function clearScanError() {
+		if (scanError) setTimeout(() => { scanError = ''; }, 3000);
+	}
+
+	async function handleScan() {
+		if (scanning || lookingUp) return;
+		scanError = '';
+		scanning = true;
+		try {
+			const { scan, Format, checkPermissions, requestPermissions } =
+				await import('@tauri-apps/plugin-barcode-scanner');
+
+			let perms = await checkPermissions();
+			if (perms === 'prompt') {
+				perms = await requestPermissions();
+			}
+			if (perms !== 'granted') {
+				scanning = false;
+				return;
+			}
+
+			const result = await scan({
+				formats: [Format.EAN13, Format.EAN8, Format.UPC_A, Format.UPC_E, Format.Code128],
+			});
+			scanning = false;
+
+			if (!result?.content) return;
+
+			lookingUp = true;
+			const product = await lookupBarcode(result.content);
+			name = product.name;
+			lookingUp = false;
+		} catch {
+			scanning = false;
+			lookingUp = false;
+			if (!isMobile) {
+				scanError = t.addModal.scanMobileOnly;
+				clearScanError();
+			}
+		}
+	}
 
 	function handleBackdropClick() {
 		closeModal();
@@ -53,13 +112,34 @@
 			<form onsubmit={handleSubmit}>
 				<div class="form-group">
 					<label for="shopping-name">{t.shoppingList.itemName}</label>
-					<input
-						id="shopping-name"
-						type="text"
-						bind:value={name}
-						placeholder={t.shoppingList.itemName}
-						required
-					/>
+					<div class="name-row">
+						<input
+							id="shopping-name"
+							type="text"
+							bind:value={name}
+							placeholder={t.shoppingList.itemName}
+							required
+						/>
+						<button
+							type="button"
+							class="scan-btn"
+							onclick={handleScan}
+							disabled={scanning || lookingUp}
+							title={t.addModal.scanBarcode}
+						>
+							{#if scanning || lookingUp}
+								<i class="ri-loader-4-line spin"></i>
+							{:else}
+								<i class="ri-barcode-line"></i>
+							{/if}
+						</button>
+					</div>
+					{#if lookingUp}
+						<span class="scan-status">{t.addModal.lookingUp}</span>
+					{/if}
+					{#if scanError}
+						<span class="scan-status scan-error">{scanError}</span>
+					{/if}
 				</div>
 
 				<div class="form-group">
@@ -216,5 +296,61 @@
 	.submit-btn:disabled {
 		opacity: 0.6;
 		cursor: not-allowed;
+	}
+
+	.name-row {
+		display: flex;
+		gap: 8px;
+		align-items: stretch;
+	}
+
+	.name-row input {
+		flex: 1;
+		min-width: 0;
+	}
+
+	.scan-btn {
+		width: 48px;
+		flex-shrink: 0;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		border: 1px solid rgba(0, 0, 0, 0.06);
+		border-radius: var(--radius-s);
+		background: rgba(255, 255, 255, 0.8);
+		color: var(--accent-pink);
+		font-size: 22px;
+		cursor: pointer;
+		transition: background 0.2s ease, transform 0.2s ease;
+	}
+
+	.scan-btn:active {
+		transform: scale(0.93);
+	}
+
+	.scan-btn:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
+
+	.scan-status {
+		display: block;
+		font-size: 12px;
+		color: var(--text-soft);
+		margin-top: 4px;
+		font-family: 'Poppins', sans-serif;
+	}
+
+	.scan-error {
+		color: var(--accent-pink);
+	}
+
+	.spin {
+		animation: spin 1s linear infinite;
+	}
+
+	@keyframes spin {
+		from { transform: rotate(0deg); }
+		to { transform: rotate(360deg); }
 	}
 </style>

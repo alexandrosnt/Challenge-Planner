@@ -25,6 +25,7 @@
 	let isMobile = $state(false);
 	let scanning = $state(false);
 	let lookingUp = $state(false);
+	let scanError = $state('');
 
 	// Form fields
 	let name = $state('');
@@ -64,8 +65,13 @@
 		}
 	});
 
+	function clearScanError() {
+		if (scanError) setTimeout(() => { scanError = ''; }, 3000);
+	}
+
 	async function handleScan() {
 		if (scanning || lookingUp) return;
+		scanError = '';
 		scanning = true;
 		try {
 			const { scan, Format, checkPermissions, requestPermissions } =
@@ -97,6 +103,10 @@
 		} catch {
 			scanning = false;
 			lookingUp = false;
+			if (!isMobile) {
+				scanError = t.addModal.scanMobileOnly;
+				clearScanError();
+			}
 		}
 	}
 
@@ -166,24 +176,25 @@
 							placeholder={t.addModal.productName}
 							required
 						/>
-						{#if isMobile}
-							<button
-								type="button"
-								class="scan-btn"
-								onclick={handleScan}
-								disabled={scanning || lookingUp}
-								title={t.addModal.scanBarcode}
-							>
-								{#if scanning || lookingUp}
-									<i class="ri-loader-4-line spin"></i>
-								{:else}
-									<i class="ri-barcode-line"></i>
-								{/if}
-							</button>
-						{/if}
+						<button
+							type="button"
+							class="scan-btn"
+							onclick={handleScan}
+							disabled={scanning || lookingUp}
+							title={t.addModal.scanBarcode}
+						>
+							{#if scanning || lookingUp}
+								<i class="ri-loader-4-line spin"></i>
+							{:else}
+								<i class="ri-barcode-line"></i>
+							{/if}
+						</button>
 					</div>
 					{#if lookingUp}
 						<span class="scan-status">{t.addModal.lookingUp}</span>
+					{/if}
+					{#if scanError}
+						<span class="scan-status scan-error">{scanError}</span>
 					{/if}
 				</div>
 
@@ -427,6 +438,10 @@
 		color: var(--text-soft);
 		margin-top: 4px;
 		font-family: 'Poppins', sans-serif;
+	}
+
+	.scan-error {
+		color: var(--accent-pink);
 	}
 
 	.spin {
