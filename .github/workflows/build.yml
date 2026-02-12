@@ -120,30 +120,26 @@ jobs:
         run: |
           MAIN_KT="src-tauri/gen/android/app/src/main/java/com/alexandrosnt/useup/MainActivity.kt"
           GRADLE="src-tauri/gen/android/app/build.gradle.kts"
-
-          cat > "$MAIN_KT" <<'KOTLIN'
-package com.alexandrosnt.useup
-
-import android.os.Bundle
-import android.view.View
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.updatePadding
-
-class MainActivity : TauriActivity() {
-  override fun onCreate(savedInstanceState: Bundle?) {
-    super.onCreate(savedInstanceState)
-
-    val contentView = findViewById<View>(android.R.id.content)
-    ViewCompat.setOnApplyWindowInsetsListener(contentView) { view, insets ->
-      val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-      view.updatePadding(bottom = systemBars.bottom)
-      insets
-    }
-  }
-}
-KOTLIN
-
+          printf '%s\n' \
+            'package com.alexandrosnt.useup' \
+            '' \
+            'import android.os.Bundle' \
+            'import android.view.View' \
+            'import androidx.core.view.ViewCompat' \
+            'import androidx.core.view.WindowInsetsCompat' \
+            'import androidx.core.view.updatePadding' \
+            '' \
+            'class MainActivity : TauriActivity() {' \
+            '  override fun onCreate(savedInstanceState: Bundle?) {' \
+            '    super.onCreate(savedInstanceState)' \
+            '    val contentView = findViewById<View>(android.R.id.content)' \
+            '    ViewCompat.setOnApplyWindowInsetsListener(contentView) { view, insets ->' \
+            '      val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())' \
+            '      view.updatePadding(bottom = systemBars.bottom)' \
+            '      insets' \
+            '    }' \
+            '  }' \
+            '}' > "$MAIN_KT"
           if ! grep -q "androidx.core:core-ktx" "$GRADLE"; then
             sed -i '/dependencies {/a\    implementation("androidx.core:core-ktx:1.13.1")' "$GRADLE"
           fi
