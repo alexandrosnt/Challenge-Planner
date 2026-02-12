@@ -3,6 +3,7 @@
 	import { getItems, addPanItem, logDeclutter, type Item } from '$lib/db/queries';
 	import { getAuthState } from '$lib/stores/auth.svelte';
 	import { closeModal } from '$lib/stores/modal.svelte';
+	import { triggerRefresh } from '$lib/stores/refresh.svelte';
 	import { t } from '$lib/i18n/index.svelte';
 
 	let { mode, onPicked }: {
@@ -85,6 +86,7 @@
 		try {
 			await addPanItem(userId, selectedItem.id, quantity);
 			closeModal();
+			triggerRefresh();
 			onPicked?.();
 		} catch (e) {
 			console.error('Failed to add pan item:', e);
@@ -107,6 +109,7 @@
 				declutterMethod === 'sold' ? Number(declutterAmount) || 0 : 0
 			);
 			closeModal();
+			triggerRefresh();
 			onPicked?.();
 		} catch (e) {
 			console.error('Failed to declutter item:', e);
@@ -453,7 +456,7 @@
 	.item-list {
 		flex: 1;
 		overflow-y: auto;
-		padding: 12px 20px 16px;
+		padding: 12px 20px calc(16px + env(safe-area-inset-bottom, 0px));
 		-ms-overflow-style: none;
 		scrollbar-width: none;
 	}
@@ -578,7 +581,7 @@
 	/* Confirm Panel */
 	.confirm-panel {
 		border-top: 1px solid rgba(0, 0, 0, 0.06);
-		padding: 16px 20px 32px;
+		padding: 16px 20px calc(32px + env(safe-area-inset-bottom, 0px));
 		flex-shrink: 0;
 		background: #fdfbf7;
 	}

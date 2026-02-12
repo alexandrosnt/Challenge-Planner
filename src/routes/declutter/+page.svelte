@@ -1,6 +1,6 @@
 <script lang="ts">
-    import { onMount } from 'svelte';
     import GlassCard from '$lib/components/GlassCard.svelte';
+    import { getRefreshSignal } from '$lib/stores/refresh.svelte';
     import SectionTitle from '$lib/components/SectionTitle.svelte';
     import { loadDeclutterPageData, logDeclutter, checkAchievements, type DeclutterPageData, type DeclutterCandidate } from '$lib/db/queries';
     import { getAuthState } from '$lib/stores/auth.svelte';
@@ -13,6 +13,7 @@
     let method = $state('donated');
     let reason = $state('');
     let amountRecovered = $state('');
+    let refresh = getRefreshSignal();
     let processing = $state(false);
 
     let donatedItems = $derived(data ? data.decluttered.filter(d => d.method === 'donated') : []);
@@ -68,10 +69,12 @@
         return new Date(dateStr).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
     }
 
-    onMount(async () => {
-        await loadData();
-        const userId = auth.currentUser?.id;
-        if (userId) await checkAchievements(userId);
+    $effect(() => {
+        refresh.value;
+        loadData().then(() => {
+            const userId = auth.currentUser?.id;
+            if (userId) checkAchievements(userId).catch(() => {});
+        });
     });
 </script>
 

@@ -1,11 +1,11 @@
 <script>
-	import GlassCard from '$lib/components/GlassCard.svelte';
-	import ProgressBar from '$lib/components/ProgressBar.svelte';
-	import { logUsage, getUsageLog, logDeclutter, getItemWithStats, markItemUsedUp } from '$lib/db/queries';
+	import { logUsage, getUsageLog, logDeclutter, getItemWithStats, markItemUsedUp, updateItem, deleteItem, getCategories, getSubcategories } from '$lib/db/queries';
 	import { getAuthState } from '$lib/stores/auth.svelte';
+	import { triggerRefresh } from '$lib/stores/refresh.svelte';
 	/** @typedef {import('$lib/db/queries').Item} Item */
 	/** @typedef {import('$lib/db/queries').UsageLogEntry} UsageLogEntry */
-	import { onMount } from 'svelte';
+	/** @typedef {import('$lib/db/queries').Category} Category */
+	/** @typedef {import('$lib/db/queries').Subcategory} Subcategory */
 	import { t } from '$lib/i18n/index.svelte';
 
 	let auth = getAuthState();
@@ -22,6 +22,19 @@
 	/** @type {Item | null} */
 	let currentItem = $state(null);
 
+	// Edit state
+	let editing = $state(false);
+	let confirmDelete = $state(false);
+	let editName = $state('');
+	let editCategoryId = $state(0);
+	let editSubcategoryId = $state(0);
+	let editPrice = $state('');
+	let editNotes = $state('');
+	/** @type {Category[]} */
+	let categories = $state([]);
+	/** @type {Subcategory[]} */
+	let subcategories = $state([]);
+
 	$effect(() => {
 		if (item) {
 			loadData(item.id);
@@ -31,6 +44,14 @@
 			method = 'donated';
 			amountRecovered = '';
 			currentItem = null;
+			editing = false;
+			confirmDelete = false;
+		}
+	});
+
+	$effect(() => {
+		if (editing && editCategoryId > 0) {
+			getSubcategories(editCategoryId).then(sc => { subcategories = sc; });
 		}
 	});
 
@@ -58,6 +79,7 @@
 		loading = true;
 		try {
 			await logUsage(userId, currentItem.id);
+			triggerRefresh();
 			await loadData(currentItem.id);
 		} finally {
 			loading = false;
@@ -71,6 +93,7 @@
 		loading = true;
 		try {
 			await markItemUsedUp(userId, currentItem.id);
+			triggerRefresh();
 			onClose();
 		} finally {
 			loading = false;
@@ -90,6 +113,7 @@
 				reason || undefined,
 				method === 'sold' ? Number(amountRecovered) || 0 : 0
 			);
+			triggerRefresh();
 			onClose();
 		} finally {
 			loading = false;
@@ -118,6 +142,65 @@
 		return Number(value).toFixed(2) + '€';
 	}
 
+	async function startEdit() {
+		if (!displayItem) return;
+		editName = displayItem.name;
+		editCategoryId = displayItem.category_id;
+		editSubcategoryId = displayItem.subcategory_id ?? 0;
+		editPrice = displayItem.purchase_price != null ? String(displayItem.purchase_price) : '';
+		editNotes = displayItem.notes ?? '';
+		categories = await getCategories();
+		if (displayItem.category_id) {
+			subcategories = await getSubcategories(displayItem.category_id);
+		}
+		editing = true;
+		confirmDelete = false;
+	}
+
+	function cancelEdit() {
+		editing = false;
+		confirmDelete = false;
+	}
+
+	async function handleSave() {
+		if (!displayItem) return;
+		const userId = auth.currentUser?.id;
+		if (!userId) return;
+		loading = true;
+		try {
+			await updateItem(userId, displayItem.id, {
+				name: editName,
+				category_id: editCategoryId,
+				subcategory_id: editSubcategoryId > 0 ? editSubcategoryId : null,
+				purchase_price: editPrice ? Number(editPrice) : null,
+				notes: editNotes || null
+			});
+			triggerRefresh();
+			await loadData(displayItem.id);
+			editing = false;
+		} finally {
+			loading = false;
+		}
+	}
+
+	async function handleDelete() {
+		if (!confirmDelete) {
+			confirmDelete = true;
+			return;
+		}
+		if (!displayItem) return;
+		const userId = auth.currentUser?.id;
+		if (!userId) return;
+		loading = true;
+		try {
+			await deleteItem(userId, displayItem.id);
+			triggerRefresh();
+			onClose();
+		} finally {
+			loading = false;
+		}
+	}
+
 	let displayItem = $derived(currentItem ?? item);
 	let costPerUse = $derived(
 		displayItem?.purchase_price && displayItem?.usage_count && displayItem.usage_count > 0
@@ -138,122 +221,215 @@
 			{#if displayItem}
 				<!-- Header -->
 				<div class="sheet-header">
-					<div class="header-left">
-						<h2 class="item-name">{displayItem.name}</h2>
-						<span class="status-badge"
-							class:status-active={displayItem.status === 'active'}
-							class:status-finished={displayItem.status === 'used_up'}
-							class:status-decluttered={displayItem.status === 'decluttered'}
-						>
-							{#if displayItem.status === 'active'}
-								{t.common.active}
-							{:else if displayItem.status === 'used_up'}
-								{t.common.finished}
-							{:else}
-								{t.common.decluttered}
-							{/if}
-						</span>
-					</div>
-					<button class="close-btn" onclick={onClose} aria-label="Close detail sheet">
-						<i class="ri-close-line"></i>
-					</button>
-				</div>
-
-				<!-- Stats Row -->
-				<div class="stats-row">
-					<div class="stat-block">
-						<span class="stat-value">{formatCurrency(costPerUse)}</span>
-						<span class="stat-label">{t.itemDetail.costPerUse}</span>
-					</div>
-					<div class="stat-block">
-						<span class="stat-value">{displayItem.usage_count ?? 0}</span>
-						<span class="stat-label">{t.itemDetail.totalUses}</span>
-					</div>
-					<div class="stat-block">
-						<span class="stat-value category-label">{displayItem.category_name ?? t.itemDetail.na}</span>
-						{#if displayItem.subcategory_name}
-							<span class="stat-label">{displayItem.subcategory_name}</span>
-						{:else}
-							<span class="stat-label">{t.common.category}</span>
+					{#if editing}
+						<div class="header-left">
+							<h2 class="item-name">{t.itemDetail.edit}</h2>
+						</div>
+					{:else}
+						<div class="header-left">
+							<h2 class="item-name">{displayItem.name}</h2>
+							<span class="status-badge"
+								class:status-active={displayItem.status === 'active'}
+								class:status-finished={displayItem.status === 'used_up'}
+								class:status-decluttered={displayItem.status === 'decluttered'}
+							>
+								{#if displayItem.status === 'active'}
+									{t.common.active}
+								{:else if displayItem.status === 'used_up'}
+									{t.common.finished}
+								{:else}
+									{t.common.decluttered}
+								{/if}
+							</span>
+						</div>
+					{/if}
+					<div class="header-actions">
+						{#if !editing}
+							<button class="close-btn" onclick={startEdit} aria-label="Edit item">
+								<i class="ri-pencil-line"></i>
+							</button>
 						{/if}
+						<button class="close-btn" onclick={onClose} aria-label="Close detail sheet">
+							<i class="ri-close-line"></i>
+						</button>
 					</div>
 				</div>
 
-				<!-- Log Usage Button -->
-				{#if displayItem.status === 'active'}
-					<button class="log-usage-btn" onclick={handleLogUsage} disabled={loading}>
-						<i class="ri-add-circle-line"></i>
-						{loading ? t.itemDetail.logging : t.itemDetail.logUsage}
-					</button>
-					<button class="finished-btn" onclick={handleMarkFinished} disabled={loading}>
-						<i class="ri-checkbox-circle-line"></i>
-						{t.itemDetail.markFinished}
-					</button>
-				{/if}
-
-				<!-- Usage Log -->
-				<div class="section-title">{t.itemDetail.usageHistory}</div>
-				{#if usageLog.length === 0}
-					<p class="empty-text">{t.itemDetail.noUsageYet}</p>
-				{:else}
-					<div class="usage-list">
-						{#each usageLog as entry (entry.id)}
-							<div class="usage-row">
-								<i class="ri-checkbox-circle-line usage-icon"></i>
-								<div class="usage-info">
-									<span class="usage-date">{formatDate(entry.used_at)}</span>
-									{#if entry.notes}
-										<span class="usage-notes">{entry.notes}</span>
-									{/if}
-								</div>
-							</div>
-						{/each}
-					</div>
-				{/if}
-
-				<!-- Declutter Section (active items only) -->
-				{#if displayItem.status === 'active'}
-					<div class="declutter-section">
-						<div class="section-title">{t.itemDetail.declutterThisItem}</div>
-
+				{#if editing}
+					<!-- Edit Form -->
+					<div class="edit-form">
 						<div class="form-group">
-							<label for="declutter-reason">{t.itemDetail.reason}</label>
-							<textarea
-								id="declutter-reason"
-								bind:value={reason}
-								rows="3"
-								placeholder={t.itemDetail.whyLettingGo}
-							></textarea>
+							<label for="edit-name">{t.itemDetail.name}</label>
+							<input
+								id="edit-name"
+								type="text"
+								bind:value={editName}
+							/>
 						</div>
 
 						<div class="form-group">
-							<label for="declutter-method">{t.itemDetail.method}</label>
-							<select id="declutter-method" bind:value={method}>
-								<option value="donated">{t.itemDetail.donated}</option>
-								<option value="sold">{t.itemDetail.sold}</option>
-								<option value="trashed">{t.itemDetail.trashed}</option>
-								<option value="gifted">{t.itemDetail.gifted}</option>
+							<label for="edit-category">{t.itemDetail.category}</label>
+							<select id="edit-category" bind:value={editCategoryId}>
+								{#each categories as cat (cat.id)}
+									<option value={cat.id}>{cat.name}</option>
+								{/each}
 							</select>
 						</div>
 
-						{#if method === 'sold'}
+						{#if subcategories.length > 0}
 							<div class="form-group">
-								<label for="declutter-amount">{t.itemDetail.amountRecovered}</label>
-								<input
-									id="declutter-amount"
-									type="number"
-									step="0.01"
-									min="0"
-									bind:value={amountRecovered}
-									placeholder="0.00"
-								/>
+								<label for="edit-subcategory">{t.itemDetail.subcategory}</label>
+								<select id="edit-subcategory" bind:value={editSubcategoryId}>
+									<option value={0}>{t.common.none}</option>
+									{#each subcategories as sub (sub.id)}
+										<option value={sub.id}>{sub.name}</option>
+									{/each}
+								</select>
 							</div>
 						{/if}
 
-						<button class="declutter-btn" onclick={handleDeclutter} disabled={loading}>
-							{loading ? t.itemDetail.processing : t.itemDetail.declutterItem}
-						</button>
+						<div class="form-group">
+							<label for="edit-price">{t.itemDetail.purchasePrice}</label>
+							<input
+								id="edit-price"
+								type="number"
+								step="0.01"
+								min="0"
+								bind:value={editPrice}
+								placeholder="0.00"
+							/>
+						</div>
+
+						<div class="form-group">
+							<label for="edit-notes">{t.itemDetail.notes}</label>
+							<textarea
+								id="edit-notes"
+								bind:value={editNotes}
+								rows="3"
+							></textarea>
+						</div>
+
+						<div class="edit-actions">
+							<button class="save-btn" onclick={handleSave} disabled={loading}>
+								{loading ? t.itemDetail.saving : t.itemDetail.save}
+							</button>
+							<button class="cancel-btn" onclick={cancelEdit}>
+								{t.itemDetail.cancel}
+							</button>
+						</div>
+
+						<div class="delete-zone">
+							{#if confirmDelete}
+								<p class="delete-confirm-text">{t.itemDetail.deleteConfirm}</p>
+							{/if}
+							<button class="delete-btn" onclick={handleDelete} disabled={loading}>
+								{#if loading && confirmDelete}
+									{t.itemDetail.deleting}
+								{:else if confirmDelete}
+									{t.itemDetail.deleteConfirm}
+								{:else}
+									{t.itemDetail.delete}
+								{/if}
+							</button>
+						</div>
 					</div>
+				{:else}
+					<!-- Stats Row -->
+					<div class="stats-row">
+						<div class="stat-block">
+							<span class="stat-value">{formatCurrency(costPerUse)}</span>
+							<span class="stat-label">{t.itemDetail.costPerUse}</span>
+						</div>
+						<div class="stat-block">
+							<span class="stat-value">{displayItem.usage_count ?? 0}</span>
+							<span class="stat-label">{t.itemDetail.totalUses}</span>
+						</div>
+						<div class="stat-block">
+							<span class="stat-value category-label">{displayItem.category_name ?? t.itemDetail.na}</span>
+							{#if displayItem.subcategory_name}
+								<span class="stat-label">{displayItem.subcategory_name}</span>
+							{:else}
+								<span class="stat-label">{t.common.category}</span>
+							{/if}
+						</div>
+					</div>
+
+					<!-- Log Usage Button -->
+					{#if displayItem.status === 'active'}
+						<button class="log-usage-btn" onclick={handleLogUsage} disabled={loading}>
+							<i class="ri-add-circle-line"></i>
+							{loading ? t.itemDetail.logging : t.itemDetail.logUsage}
+						</button>
+						<button class="finished-btn" onclick={handleMarkFinished} disabled={loading}>
+							<i class="ri-checkbox-circle-line"></i>
+							{t.itemDetail.markFinished}
+						</button>
+					{/if}
+
+					<!-- Usage Log -->
+					<div class="section-title">{t.itemDetail.usageHistory}</div>
+					{#if usageLog.length === 0}
+						<p class="empty-text">{t.itemDetail.noUsageYet}</p>
+					{:else}
+						<div class="usage-list">
+							{#each usageLog as entry (entry.id)}
+								<div class="usage-row">
+									<i class="ri-checkbox-circle-line usage-icon"></i>
+									<div class="usage-info">
+										<span class="usage-date">{formatDate(entry.used_at)}</span>
+										{#if entry.notes}
+											<span class="usage-notes">{entry.notes}</span>
+										{/if}
+									</div>
+								</div>
+							{/each}
+						</div>
+					{/if}
+
+					<!-- Declutter Section (active items only) -->
+					{#if displayItem.status === 'active'}
+						<div class="declutter-section">
+							<div class="section-title">{t.itemDetail.declutterThisItem}</div>
+
+							<div class="form-group">
+								<label for="declutter-reason">{t.itemDetail.reason}</label>
+								<textarea
+									id="declutter-reason"
+									bind:value={reason}
+									rows="3"
+									placeholder={t.itemDetail.whyLettingGo}
+								></textarea>
+							</div>
+
+							<div class="form-group">
+								<label for="declutter-method">{t.itemDetail.method}</label>
+								<select id="declutter-method" bind:value={method}>
+									<option value="donated">{t.itemDetail.donated}</option>
+									<option value="sold">{t.itemDetail.sold}</option>
+									<option value="trashed">{t.itemDetail.trashed}</option>
+									<option value="gifted">{t.itemDetail.gifted}</option>
+								</select>
+							</div>
+
+							{#if method === 'sold'}
+								<div class="form-group">
+									<label for="declutter-amount">{t.itemDetail.amountRecovered}</label>
+									<input
+										id="declutter-amount"
+										type="number"
+										step="0.01"
+										min="0"
+										bind:value={amountRecovered}
+										placeholder="0.00"
+									/>
+								</div>
+							{/if}
+
+							<button class="declutter-btn" onclick={handleDeclutter} disabled={loading}>
+								{loading ? t.itemDetail.processing : t.itemDetail.declutterItem}
+							</button>
+						</div>
+					{/if}
 				{/if}
 			{/if}
 		</div>
@@ -326,6 +502,12 @@
 		gap: 8px;
 		flex: 1;
 		min-width: 0;
+	}
+
+	.header-actions {
+		display: flex;
+		gap: 8px;
+		flex-shrink: 0;
 	}
 
 	.item-name {
@@ -556,7 +738,7 @@
 	.declutter-section {
 		border-top: 1px solid rgba(0, 0, 0, 0.06);
 		margin-top: 12px;
-		padding-bottom: 32px;
+		padding-bottom: calc(32px + env(safe-area-inset-bottom, 0px));
 	}
 
 	.form-group {
@@ -622,6 +804,97 @@
 	}
 
 	.declutter-btn:disabled {
+		opacity: 0.6;
+		cursor: not-allowed;
+	}
+
+	/* Edit Form */
+	.edit-form {
+		padding: 20px 0 calc(32px + env(safe-area-inset-bottom, 0px));
+	}
+
+	.edit-actions {
+		display: flex;
+		gap: 10px;
+		padding: 4px 20px 0;
+	}
+
+	.save-btn {
+		flex: 1;
+		padding: 14px;
+		background: var(--primary-gradient);
+		border: none;
+		border-radius: 50px;
+		color: white;
+		font-family: 'Poppins', sans-serif;
+		font-size: 15px;
+		font-weight: 600;
+		cursor: pointer;
+		transition: transform 0.2s ease, opacity 0.2s ease;
+	}
+
+	.save-btn:active {
+		transform: scale(0.97);
+	}
+
+	.save-btn:disabled {
+		opacity: 0.6;
+		cursor: not-allowed;
+	}
+
+	.cancel-btn {
+		flex: 1;
+		padding: 14px;
+		background: rgba(0, 0, 0, 0.06);
+		border: 1px solid rgba(0, 0, 0, 0.08);
+		border-radius: 50px;
+		color: var(--text-dark);
+		font-family: 'Poppins', sans-serif;
+		font-size: 15px;
+		font-weight: 600;
+		cursor: pointer;
+		transition: transform 0.2s ease, background 0.2s ease;
+	}
+
+	.cancel-btn:active {
+		transform: scale(0.97);
+		background: rgba(0, 0, 0, 0.1);
+	}
+
+	/* Delete Zone */
+	.delete-zone {
+		margin-top: 24px;
+		padding: 0 20px;
+	}
+
+	.delete-confirm-text {
+		font-family: 'Poppins', sans-serif;
+		font-size: 13px;
+		color: #C62828;
+		text-align: center;
+		margin: 0 0 10px;
+	}
+
+	.delete-btn {
+		width: 100%;
+		padding: 14px;
+		background: #FFEBEE;
+		color: #C62828;
+		border: 1px solid rgba(198, 40, 40, 0.15);
+		border-radius: 50px;
+		font-family: 'Poppins', sans-serif;
+		font-size: 15px;
+		font-weight: 600;
+		cursor: pointer;
+		transition: transform 0.2s ease, background 0.2s ease;
+	}
+
+	.delete-btn:active {
+		transform: scale(0.97);
+		background: #FFCDD2;
+	}
+
+	.delete-btn:disabled {
 		opacity: 0.6;
 		cursor: not-allowed;
 	}

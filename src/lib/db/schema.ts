@@ -72,7 +72,8 @@ CREATE TABLE IF NOT EXISTS challenges (
 
 CREATE TABLE IF NOT EXISTS budgets (
 	id INTEGER PRIMARY KEY AUTOINCREMENT,
-	category_id INTEGER NOT NULL,
+	name TEXT,
+	category_id INTEGER,
 	monthly_limit REAL NOT NULL,
 	spent REAL NOT NULL DEFAULT 0,
 	month TEXT NOT NULL,

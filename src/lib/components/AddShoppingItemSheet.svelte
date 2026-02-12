@@ -2,6 +2,7 @@
 	import { addShoppingItem } from '$lib/db/queries';
 	import { getAuthState } from '$lib/stores/auth.svelte';
 	import { closeModal } from '$lib/stores/modal.svelte';
+	import { triggerRefresh } from '$lib/stores/refresh.svelte';
 	import { t } from '$lib/i18n/index.svelte';
 
 	let { onAdded }: { onAdded?: () => void } = $props();
@@ -30,6 +31,7 @@
 		try {
 			await addShoppingItem(userId, name.trim(), quantity, notes.trim() || null);
 			closeModal();
+			triggerRefresh();
 			onAdded?.();
 		} finally {
 			submitting = false;
@@ -135,7 +137,7 @@
 	.sheet-body {
 		flex: 1;
 		overflow-y: auto;
-		padding: 20px 20px 32px;
+		padding: 20px 20px calc(32px + env(safe-area-inset-bottom, 0px));
 		-ms-overflow-style: none;
 		scrollbar-width: none;
 	}

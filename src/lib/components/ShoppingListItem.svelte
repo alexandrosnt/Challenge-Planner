@@ -11,9 +11,10 @@
         item: ShoppingItem;
         onToggle?: (id: number) => void;
         onDelete?: (id: number) => void;
+        onEdit?: (id: number) => void;
     }
 
-    let { item, onToggle, onDelete }: Props = $props();
+    let { item, onToggle, onDelete, onEdit }: Props = $props();
 
     let isChecked = $derived(item.checked === 1);
 </script>
@@ -39,6 +40,11 @@
         {/if}
     </div>
 
+    {#if onEdit}
+        <button class="delete-btn" onclick={() => onEdit?.(item.id)} aria-label="Edit {item.name}">
+            <i class="ri-pencil-line"></i>
+        </button>
+    {/if}
     <button class="delete-btn" onclick={() => onDelete?.(item.id)} aria-label="Delete {item.name}">
         <i class="ri-delete-bin-6-line"></i>
     </button>

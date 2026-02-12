@@ -1,19 +1,30 @@
 <script lang="ts">
-    import { onMount } from 'svelte';
+    import { getRefreshSignal, triggerRefresh } from '$lib/stores/refresh.svelte';
     import GlassCard from '$lib/components/GlassCard.svelte';
     import SectionTitle from '$lib/components/SectionTitle.svelte';
     import ProgressBar from '$lib/components/ProgressBar.svelte';
-    import { getBudgetWithSpending, getPurchases, getTotalSpentThisMonth, type Budget, type Purchase } from '$lib/db/queries';
+    import { getBudgetWithSpending, getPurchases, getTotalSpentThisMonth, getCategories, updateBudget, deleteBudget, updatePurchase, deletePurchase, type Budget, type Purchase, type Category } from '$lib/db/queries';
     import { getAuthState } from '$lib/stores/auth.svelte';
     import { t } from '$lib/i18n/index.svelte';
 
     let auth = getAuthState();
+    let refresh = getRefreshSignal();
 
     let budgets = $state<Budget[]>([]);
     let purchases = $state<Purchase[]>([]);
     let totalSpent = $state(0);
     let loading = $state(true);
     let currentMonth = $state(new Date().toISOString().slice(0, 7));
+
+    // Edit state
+    let editingId: number | null = $state(null);
+    let editName: string = $state('');
+    let editCategoryId: number = $state(0);
+    let editLimit: string = $state('');
+    let editCarryover: boolean = $state(false);
+    let confirmDeleteId: number | null = $state(null);
+    let saving: boolean = $state(false);
+    let categories: Category[] = $state([]);
 
     let totalLimit = $derived(budgets.reduce((sum, b) => sum + b.monthly_limit, 0));
     let budgetPct = $derived(totalLimit > 0 ? Math.round((totalSpent / totalLimit) * 100) : 0);
@@ -42,13 +53,142 @@
         return amount.toFixed(2) + '\u20AC';
     }
 
-    onMount(() => {
+    async function startEdit(budget: Budget) {
+        editingId = budget.id;
+        editName = budget.name ?? '';
+        editCategoryId = budget.category_id ?? 0;
+        editLimit = String(budget.monthly_limit);
+        editCarryover = budget.carryover === 1;
+        confirmDeleteId = null;
+        categories = await getCategories();
+    }
+
+    function cancelEdit() {
+        editingId = null;
+        editName = '';
+        editCategoryId = 0;
+        editLimit = '';
+        editCarryover = false;
+        confirmDeleteId = null;
+        saving = false;
+    }
+
+    async function handleSaveBudget() {
+        if (editingId === null) return;
+        const userId = auth.currentUser?.id;
+        if (!userId) return;
+        saving = true;
+        try {
+            await updateBudget(userId, editingId, {
+                name: editName.trim() || null,
+                category_id: editCategoryId === 0 ? null : editCategoryId,
+                monthly_limit: parseFloat(editLimit) || 0,
+                carryover: editCarryover,
+            });
+            triggerRefresh();
+            await loadData();
+            cancelEdit();
+        } catch (e) {
+            console.error('Failed to save budget:', e);
+        } finally {
+            saving = false;
+        }
+    }
+
+    async function handleDeleteBudget(id: number) {
+        if (confirmDeleteId !== id) {
+            confirmDeleteId = id;
+            return;
+        }
+        const userId = auth.currentUser?.id;
+        if (!userId) return;
+        saving = true;
+        try {
+            await deleteBudget(userId, id);
+            triggerRefresh();
+            await loadData();
+            cancelEdit();
+        } catch (e) {
+            console.error('Failed to delete budget:', e);
+        } finally {
+            saving = false;
+        }
+    }
+
+    // Purchase edit state
+    let editPurchaseId: number | null = $state(null);
+    let editPurchaseName = $state('');
+    let editPurchaseAmount = $state('');
+    let editPurchaseDate = $state('');
+    let editPurchaseNotes = $state('');
+    let savingPurchase = $state(false);
+    let confirmDeletePurchaseId: number | null = $state(null);
+
+    function startEditPurchase(purchase: Purchase) {
+        editPurchaseId = purchase.id;
+        editPurchaseName = purchase.name;
+        editPurchaseAmount = String(purchase.amount);
+        editPurchaseDate = purchase.purchase_date;
+        editPurchaseNotes = purchase.notes ?? '';
+        confirmDeletePurchaseId = null;
+    }
+
+    function cancelEditPurchase() {
+        editPurchaseId = null;
+        editPurchaseName = '';
+        editPurchaseAmount = '';
+        editPurchaseDate = '';
+        editPurchaseNotes = '';
+        savingPurchase = false;
+        confirmDeletePurchaseId = null;
+    }
+
+    async function handleSavePurchase() {
+        if (editPurchaseId === null) return;
+        const userId = auth.currentUser?.id;
+        if (!userId) return;
+        savingPurchase = true;
+        try {
+            await updatePurchase(userId, editPurchaseId, {
+                name: editPurchaseName.trim(),
+                amount: parseFloat(editPurchaseAmount) || 0,
+                purchase_date: editPurchaseDate,
+                notes: editPurchaseNotes.trim() || null,
+            });
+            triggerRefresh();
+            await loadData();
+            cancelEditPurchase();
+        } catch (e) {
+            console.error('Failed to save purchase:', e);
+        } finally {
+            savingPurchase = false;
+        }
+    }
+
+    async function handleDeletePurchase(id: number) {
+        if (confirmDeletePurchaseId !== id) {
+            confirmDeletePurchaseId = id;
+            return;
+        }
+        const userId = auth.currentUser?.id;
+        if (!userId) return;
+        savingPurchase = true;
+        try {
+            await deletePurchase(userId, id);
+            triggerRefresh();
+            await loadData();
+            cancelEditPurchase();
+        } catch (e) {
+            console.error('Failed to delete purchase:', e);
+        } finally {
+            savingPurchase = false;
+        }
+    }
+
+    $effect(() => {
+        refresh.value;
         loadData();
     });
-
-    export function refresh() {
-        loadData();
-    }
 </script>
 
 <header class="page-header">
@@ -61,7 +201,7 @@
         <GlassCard>
             <div class="shimmer" style="width: 100%; height: 80px; border-radius: 12px;"></div>
         </GlassCard>
-        {#each Array(2) as _}
+        {#each Array(2) as _, i (i)}
             <GlassCard>
                 <div class="shimmer" style="width: 100%; height: 60px; border-radius: 8px;"></div>
             </GlassCard>
@@ -100,26 +240,84 @@
                 {@const pct = budget.monthly_limit > 0 ? Math.round((actualSpent / budget.monthly_limit) * 100) : 0}
                 {@const left = Math.max(0, budget.monthly_limit - actualSpent)}
                 <GlassCard>
-                    <div class="budget-row">
-                        <div class="budget-header">
-                            <div class="budget-cat">
-                                <i class="{budget.category_icon} budget-icon"></i>
-                                <span class="budget-name">{budget.category_name}</span>
+                    {#if editingId === budget.id}
+                        <div class="edit-form">
+                            <div class="form-group">
+                                <label for="edit-name">{t.budgetPage.budgetName}</label>
+                                <input
+                                    id="edit-name"
+                                    type="text"
+                                    bind:value={editName}
+                                    placeholder={t.budgetPage.budgetNamePlaceholder}
+                                />
                             </div>
-                            <span class="budget-limit">{formatCurrency(budget.monthly_limit)}</span>
+                            <div class="form-group">
+                                <label for="edit-category">{t.budgetPage.categoryOptional}</label>
+                                <select id="edit-category" bind:value={editCategoryId}>
+                                    <option value={0}>{t.common.none}</option>
+                                    {#each categories as cat (cat.id)}
+                                        <option value={cat.id}>{cat.name}</option>
+                                    {/each}
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="edit-limit">{t.budgetPage.monthlyLimit}</label>
+                                <input
+                                    id="edit-limit"
+                                    type="number"
+                                    bind:value={editLimit}
+                                    step="0.01"
+                                    min="0"
+                                />
+                            </div>
+                            <label class="checkbox-row">
+                                <input type="checkbox" bind:checked={editCarryover} />
+                                <span>{t.budgetPage.carryOver}</span>
+                            </label>
+                            <div class="edit-actions">
+                                <button class="btn-cancel" onclick={cancelEdit} disabled={saving}>
+                                    {t.common.cancel}
+                                </button>
+                                <button class="btn-save" onclick={handleSaveBudget} disabled={saving}>
+                                    {saving ? t.budgetPage.saving : t.budgetPage.save}
+                                </button>
+                            </div>
+                            <button
+                                class="btn-delete"
+                                onclick={() => handleDeleteBudget(budget.id)}
+                                disabled={saving}
+                            >
+                                {#if confirmDeleteId === budget.id}
+                                    {saving ? t.budgetPage.deleting : t.budgetPage.deleteConfirm}
+                                {:else}
+                                    <i class="ri-delete-bin-line"></i> {t.budgetPage.deleteBudget}
+                                {/if}
+                            </button>
                         </div>
-                        <ProgressBar
-                            value={Math.min(pct, 100)}
-                            height="6px"
-                        />
-                        <div class="budget-footer">
-                            <span class="budget-spent">{formatCurrency(actualSpent)} {t.budgetPage.spent}</span>
-                            <span class="budget-remaining">{formatCurrency(left)} {t.budgetPage.remaining}</span>
+                    {:else}
+                        <!-- svelte-ignore a11y_click_events_have_key_events -->
+                        <!-- svelte-ignore a11y_no_static_element_interactions -->
+                        <div class="budget-row" onclick={() => startEdit(budget)}>
+                            <div class="budget-header">
+                                <div class="budget-cat">
+                                    <i class="{budget.category_icon ?? 'ri-wallet-3-line'} budget-icon"></i>
+                                    <span class="budget-name">{budget.display_name}</span>
+                                </div>
+                                <span class="budget-limit">{formatCurrency(budget.monthly_limit)}</span>
+                            </div>
+                            <ProgressBar
+                                value={Math.min(pct, 100)}
+                                height="6px"
+                            />
+                            <div class="budget-footer">
+                                <span class="budget-spent">{formatCurrency(actualSpent)} {t.budgetPage.spent}</span>
+                                <span class="budget-remaining">{formatCurrency(left)} {t.budgetPage.remaining}</span>
+                            </div>
+                            {#if budget.carryover_amount > 0}
+                                <span class="carryover-badge">+{formatCurrency(budget.carryover_amount)} {t.insights.carriedOver}</span>
+                            {/if}
                         </div>
-                        {#if budget.carryover_amount > 0}
-                            <span class="carryover-badge">+{formatCurrency(budget.carryover_amount)} {t.insights.carriedOver}</span>
-                        {/if}
-                    </div>
+                    {/if}
                 </GlassCard>
             {/each}
         {:else}
@@ -136,13 +334,57 @@
             <SectionTitle title={t.budgetPage.totalSpending} actionText={String(purchases.length)} />
             <GlassCard>
                 {#each purchases.slice(0, 10) as purchase (purchase.id)}
-                    <div class="purchase-row">
-                        <div class="purchase-info">
-                            <span class="purchase-name">{purchase.name}</span>
-                            <span class="purchase-meta">{purchase.category_name} &middot; {purchase.purchase_date}</span>
+                    {#if editPurchaseId === purchase.id}
+                        <div class="purchase-edit-form">
+                            <div class="form-group">
+                                <label for="ep-name">{t.budgetPage.purchaseName}</label>
+                                <input id="ep-name" type="text" bind:value={editPurchaseName} />
+                            </div>
+                            <div class="form-row-2">
+                                <div class="form-group">
+                                    <label for="ep-amount">{t.budgetPage.purchaseAmount}</label>
+                                    <input id="ep-amount" type="number" step="0.01" min="0" bind:value={editPurchaseAmount} />
+                                </div>
+                                <div class="form-group">
+                                    <label for="ep-date">{t.budgetPage.purchaseDate}</label>
+                                    <input id="ep-date" type="date" bind:value={editPurchaseDate} />
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="ep-notes">{t.budgetPage.purchaseNotes}</label>
+                                <input id="ep-notes" type="text" bind:value={editPurchaseNotes} placeholder="..." />
+                            </div>
+                            <div class="edit-actions">
+                                <button class="btn-cancel" onclick={cancelEditPurchase} disabled={savingPurchase}>
+                                    {t.common.cancel}
+                                </button>
+                                <button class="btn-save" onclick={handleSavePurchase} disabled={savingPurchase}>
+                                    {savingPurchase ? t.budgetPage.saving : t.budgetPage.save}
+                                </button>
+                            </div>
+                            <button
+                                class="btn-delete"
+                                onclick={() => handleDeletePurchase(purchase.id)}
+                                disabled={savingPurchase}
+                            >
+                                {#if confirmDeletePurchaseId === purchase.id}
+                                    {savingPurchase ? t.budgetPage.deleting : t.budgetPage.deleteConfirm}
+                                {:else}
+                                    <i class="ri-delete-bin-line"></i> {t.budgetPage.deletePurchase}
+                                {/if}
+                            </button>
                         </div>
-                        <span class="purchase-amount">-{formatCurrency(purchase.amount)}</span>
-                    </div>
+                    {:else}
+                        <!-- svelte-ignore a11y_click_events_have_key_events -->
+                        <!-- svelte-ignore a11y_no_static_element_interactions -->
+                        <div class="purchase-row" onclick={() => startEditPurchase(purchase)}>
+                            <div class="purchase-info">
+                                <span class="purchase-name">{purchase.name}</span>
+                                <span class="purchase-meta">{purchase.category_name} &middot; {purchase.purchase_date}</span>
+                            </div>
+                            <span class="purchase-amount">-{formatCurrency(purchase.amount)}</span>
+                        </div>
+                    {/if}
                 {/each}
             </GlassCard>
         {/if}
@@ -205,6 +447,7 @@
         display: flex;
         flex-direction: column;
         gap: 10px;
+        cursor: pointer;
     }
     .budget-header {
         display: flex;
@@ -265,9 +508,31 @@
         justify-content: space-between;
         align-items: center;
         padding: 10px 0;
+        cursor: pointer;
+        transition: background 0.15s;
+        border-radius: 8px;
+        margin: 0 -4px;
+        padding: 10px 4px;
+    }
+    .purchase-row:active {
+        background: rgba(0, 0, 0, 0.03);
     }
     .purchase-row:not(:last-child) {
         border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+    }
+    .purchase-edit-form {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        padding: 12px 0;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+    }
+    .form-row-2 {
+        display: flex;
+        gap: 10px;
+    }
+    .form-row-2 .form-group {
+        flex: 1;
     }
     .purchase-info {
         display: flex;
@@ -315,5 +580,101 @@
     @keyframes shimmer {
         0% { background-position: 200% 0; }
         100% { background-position: -200% 0; }
+    }
+
+    /* Edit form styles */
+    .edit-form {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+    }
+    .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+    .form-group label {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--text-soft);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    .form-group input,
+    .form-group select {
+        padding: 10px 12px;
+        border-radius: 10px;
+        border: 1px solid rgba(0, 0, 0, 0.08);
+        background: rgba(255, 255, 255, 0.6);
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--text-dark);
+        outline: none;
+        transition: border-color 0.2s;
+    }
+    .form-group input:focus,
+    .form-group select:focus {
+        border-color: var(--accent-pink);
+    }
+    .checkbox-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--text-dark);
+        cursor: pointer;
+    }
+    .checkbox-row input[type="checkbox"] {
+        width: 18px;
+        height: 18px;
+        accent-color: var(--accent-pink);
+    }
+    .edit-actions {
+        display: flex;
+        gap: 10px;
+    }
+    .btn-cancel,
+    .btn-save {
+        flex: 1;
+        padding: 10px 0;
+        border: none;
+        border-radius: 10px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: opacity 0.2s;
+    }
+    .btn-cancel {
+        background: rgba(0, 0, 0, 0.06);
+        color: var(--text-soft);
+    }
+    .btn-save {
+        background: var(--accent-pink);
+        color: white;
+    }
+    .btn-cancel:disabled,
+    .btn-save:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+    .btn-delete {
+        width: 100%;
+        padding: 10px 0;
+        border: 1px solid rgba(233, 30, 99, 0.2);
+        border-radius: 10px;
+        background: rgba(233, 30, 99, 0.04);
+        color: var(--accent-pink);
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.2s;
+    }
+    .btn-delete:hover {
+        background: rgba(233, 30, 99, 0.1);
+    }
+    .btn-delete:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
     }
 </style>

@@ -1,12 +1,10 @@
 <script>
-    import GlassCard from '$lib/components/GlassCard.svelte';
-    import CategoryPills from '$lib/components/CategoryPills.svelte';
     import SubcategoryPills from '$lib/components/SubcategoryPills.svelte';
     import ItemDetailSheet from '$lib/components/ItemDetailSheet.svelte';
     import { getCategories, getSubcategories, getItems } from '$lib/db/queries';
     import { getAuthState } from '$lib/stores/auth.svelte';
     import { dragscroll } from '$lib/actions/dragscroll';
-    import { onMount } from 'svelte';
+    import { getRefreshSignal } from '$lib/stores/refresh.svelte';
     import { t } from '$lib/i18n/index.svelte';
 
     let auth = getAuthState();
@@ -20,8 +18,8 @@
     let items = $state([]);
     let selectedCategoryId = $state(0);
     let selectedSubcategoryId = $state(0);
+    let refresh = getRefreshSignal();
     let selectedStatus = $state('all');
-    let viewMode = $state(/** @type {'grid' | 'list'} */ ('grid'));
     /** @type {import('$lib/db/queries').Item | null} */
     let selectedItem = $state(null);
 
@@ -50,7 +48,7 @@
         return counts;
     });
 
-    onMount(loadData);
+    $effect(() => { refresh.value; loadData(); });
 
     async function loadData() {
         const userId = auth.currentUser?.id;
@@ -99,9 +97,6 @@
         <p style="font-size: 14px; color: var(--text-soft); font-weight: 500;">{t.inventory.yourProducts}</p>
         <h1 style="font-size: 26px; font-weight: 700; letter-spacing: -0.5px;">{t.inventory.title}</h1>
     </div>
-    <button class="view-toggle" onclick={() => viewMode = viewMode === 'grid' ? 'list' : 'grid'} aria-label={viewMode === 'grid' ? t.inventory.listView : t.inventory.gridView}>
-        <i class={viewMode === 'grid' ? 'ri-list-unordered' : 'ri-grid-fill'}></i>
-    </button>
 </header>
 
 <main>
@@ -143,56 +138,20 @@
     </div>
 
     <!-- Items -->
-    {#if viewMode === 'grid'}
-        {#if loading}
-            <div class="items-grid">
-                {#each Array(6) as _}
-                    <GlassCard>
-                        <div class="item-card">
-                            <div class="shimmer" style="width: 50px; height: 50px; border-radius: var(--radius-m); margin: 0 auto 10px;"></div>
-                            <div class="shimmer" style="width: 80px; height: 14px; margin: 0 auto 4px;"></div>
-                            <div class="shimmer" style="width: 50px; height: 10px; margin: 0 auto;"></div>
-                        </div>
-                    </GlassCard>
-                {/each}
-            </div>
-        {/if}
-        <div class="items-grid" class:hidden={loading}>
-            {#each filteredItems as item (item.id)}
-                <button class="item-card-btn" onclick={() => handleItemClick(item)}>
-                    <GlassCard>
-                        <div class="item-card">
-                            <span class="item-status-dot" class:dot-active={item.status === 'active'} class:dot-finished={item.status === 'used_up'} class:dot-decluttered={item.status === 'decluttered'}></span>
-                            <div class="item-icon">
-                                <i class={item.category_icon ?? 'ri-box-3-line'}></i>
-                            </div>
-                            <h3 class="item-name">{item.name}</h3>
-                            {#if item.subcategory_name}
-                                <span class="item-sub">{item.subcategory_name}</span>
-                            {:else}
-                                <span class="item-sub">{item.category_name}</span>
-                            {/if}
-                            <div class="item-meta">
-                                {#if item.cost_per_use != null}
-                                    <span class="cost-per-use">{item.cost_per_use.toFixed(2)}€/use</span>
-                                {/if}
-                                {#if (item.usage_count ?? 0) > 0}
-                                    <span class="usage-badge">{item.usage_count}x</span>
-                                {/if}
-                            </div>
-                        </div>
-                    </GlassCard>
-                </button>
-            {:else}
-                <div class="empty-state">
-                    <i class="ri-inbox-line"></i>
-                    <p>{t.inventory.emptyState}</p>
+    {#if loading}
+        <div class="items-list">
+            {#each Array(4) as _}
+                <div class="list-item">
+                    <div class="shimmer" style="width: 42px; height: 42px; border-radius: var(--radius-s); flex-shrink: 0;"></div>
+                    <div style="flex: 1; display: flex; flex-direction: column; gap: 6px;">
+                        <div class="shimmer" style="width: 120px; height: 14px;"></div>
+                        <div class="shimmer" style="width: 70px; height: 10px;"></div>
+                    </div>
                 </div>
             {/each}
         </div>
     {:else}
-        <!-- List View -->
-        <div class="items-list" class:hidden={loading}>
+        <div class="items-list">
             {#each filteredItems as item (item.id)}
                 <button class="list-item-btn" onclick={() => handleItemClick(item)}>
                     <div class="list-item">
@@ -238,18 +197,6 @@
         align-items: center;
         justify-content: space-between;
     }
-    .view-toggle {
-        width: 40px; height: 40px;
-        border-radius: 50%;
-        border: 1px solid rgba(0,0,0,0.06);
-        background: white;
-        display: flex; align-items: center; justify-content: center;
-        font-size: 20px; color: var(--text-soft);
-        cursor: pointer;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.04);
-        transition: 0.2s;
-    }
-    .view-toggle:active { transform: scale(0.95); background: #f5f5f5; }
     .filter-scroll {
         display: flex;
         gap: 10px;
@@ -314,49 +261,13 @@
         border-color: var(--text-dark);
     }
 
-    .items-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 12px;
-    }
-    .item-card-btn {
-        background: none;
-        border: none;
-        padding: 0;
-        text-align: left;
-        cursor: pointer;
-        width: 100%;
-    }
-    .item-card { text-align: center; position: relative; }
-    .item-icon {
-        width: 50px; height: 50px; margin: 0 auto 10px;
-        background: #FFF0F3; border-radius: var(--radius-m);
-        display: flex; align-items: center; justify-content: center;
-        font-size: 22px; color: var(--accent-pink);
-    }
-    .item-name { font-size: 14px; font-weight: 600; margin-bottom: 2px; }
-    .item-sub {
-        font-size: 11px; color: var(--text-soft); text-transform: uppercase;
-        letter-spacing: 0.5px; display: block; margin-bottom: 8px;
-    }
-    .item-meta { display: flex; align-items: center; justify-content: center; gap: 8px; }
-    .cost-per-use {
-        font-size: 11px; font-weight: 600; color: var(--accent-sage);
-        background: #E8F5E9; padding: 3px 8px; border-radius: 8px;
-    }
-    .usage-badge {
-        font-size: 11px; font-weight: 700; color: var(--accent-pink);
-        background: #FFF0F3; padding: 3px 8px; border-radius: 8px;
-    }
     .empty-state {
-        grid-column: 1 / -1;
         text-align: center;
         padding: 40px 20px;
         color: var(--text-soft);
     }
     .empty-state i { font-size: 48px; margin-bottom: 12px; display: block; }
     .empty-state p { font-size: 14px; }
-    .hidden { display: none; }
     .shimmer {
         background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
         background-size: 200% 100%;
@@ -369,19 +280,6 @@
         100% { background-position: -200% 0; }
     }
 
-    /* Status dot on grid cards */
-    .item-status-dot {
-        position: absolute;
-        top: 0; right: 0;
-        width: 10px; height: 10px;
-        border-radius: 50%;
-        border: 2px solid white;
-    }
-    .dot-active { background: #4CAF50; }
-    .dot-finished { background: var(--accent-sage, #94B49F); }
-    .dot-decluttered { background: var(--text-soft); }
-
-    /* List view */
     .items-list {
         display: flex;
         flex-direction: column;

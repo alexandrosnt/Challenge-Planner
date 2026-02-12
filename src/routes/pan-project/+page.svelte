@@ -1,18 +1,23 @@
 <script lang="ts">
-    import { onMount } from 'svelte';
     import GlassCard from '$lib/components/GlassCard.svelte';
     import SectionTitle from '$lib/components/SectionTitle.svelte';
     import ProgressRing from '$lib/components/ProgressRing.svelte';
     import PanItemCard from '$lib/components/PanItemCard.svelte';
-    import { getPanItems, getPanProjectStats, markPanItemEmptied, removePanItem, type PanProjectItem, type PanProjectStats } from '$lib/db/queries';
+    import { getPanItems, getPanProjectStats, markPanItemEmptied, removePanItem, updatePanItem, type PanProjectItem, type PanProjectStats } from '$lib/db/queries';
     import { getAuthState } from '$lib/stores/auth.svelte';
+    import { getRefreshSignal, triggerRefresh } from '$lib/stores/refresh.svelte';
     import { t } from '$lib/i18n/index.svelte';
 
     let auth = getAuthState();
+    let refresh = getRefreshSignal();
 
     let items = $state<PanProjectItem[]>([]);
     let stats = $state<PanProjectStats | null>(null);
     let loading = $state(true);
+
+    let editingId: number | null = $state(null);
+    let editQuantity = $state(1);
+    let saving = $state(false);
 
     let completionPct = $derived(
         stats && stats.total > 0 ? Math.round((stats.emptied / stats.total) * 100) : 0
@@ -45,13 +50,36 @@
         await loadData();
     }
 
-    onMount(() => {
+    function startEdit(id: number) {
+        const item = items.find(i => i.id === id);
+        if (!item) return;
+        editingId = id;
+        editQuantity = item.quantity;
+    }
+
+    function cancelEdit() {
+        editingId = null;
+        editQuantity = 1;
+        saving = false;
+    }
+
+    async function handleSaveQuantity() {
+        const userId = auth.currentUser?.id;
+        if (!userId || editingId === null) return;
+        saving = true;
+        try {
+            await updatePanItem(userId, editingId, editQuantity);
+            triggerRefresh();
+            await loadData();
+        } finally {
+            cancelEdit();
+        }
+    }
+
+    $effect(() => {
+        refresh.value;
         loadData();
     });
-
-    export function refresh() {
-        loadData();
-    }
 </script>
 
 <header class="page-header">
@@ -65,7 +93,7 @@
             <div class="shimmer" style="width: 120px; height: 120px; border-radius: 50%;"></div>
             <div class="shimmer" style="width: 160px; height: 14px; margin-top: 14px;"></div>
         </div>
-        {#each Array(3) as _}
+        {#each Array(3) as _, i (i)}
             <GlassCard>
                 <div style="display: flex; gap: 12px; align-items: center;">
                     <div class="shimmer" style="width: 40px; height: 40px; border-radius: 50%;"></div>
@@ -95,8 +123,32 @@
                     {item}
                     onMarkEmptied={handleMarkEmptied}
                     onRemove={handleRemove}
+                    onEdit={startEdit}
                 />
             {/each}
+
+            {#if editingId !== null}
+                <GlassCard>
+                    <div class="edit-form">
+                        <label class="edit-label" for="edit-quantity">{t.panProject.editQuantity}</label>
+                        <input
+                            id="edit-quantity"
+                            class="edit-input"
+                            type="number"
+                            min="1"
+                            bind:value={editQuantity}
+                        />
+                        <div class="edit-actions">
+                            <button class="edit-btn-cancel" onclick={cancelEdit} disabled={saving}>
+                                {t.common.cancel}
+                            </button>
+                            <button class="edit-btn-save" onclick={handleSaveQuantity} disabled={saving}>
+                                {saving ? t.panProject.saving : t.panProject.save}
+                            </button>
+                        </div>
+                    </div>
+                </GlassCard>
+            {/if}
         {:else}
             <GlassCard>
                 <div class="empty-state">
@@ -167,5 +219,74 @@
     @keyframes shimmer {
         0% { background-position: 200% 0; }
         100% { background-position: -200% 0; }
+    }
+    .edit-form {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+    }
+    .edit-label {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--text-dark);
+    }
+    .edit-input {
+        width: 100%;
+        padding: 12px 14px;
+        border: 1px solid var(--glass-border);
+        border-radius: var(--radius-s);
+        font-family: 'Poppins', sans-serif;
+        font-size: 15px;
+        color: var(--text-dark);
+        background: white;
+        outline: none;
+        transition: border-color 0.2s;
+        box-sizing: border-box;
+    }
+    .edit-input:focus {
+        border-color: var(--accent-primary, #6366f1);
+    }
+    .edit-actions {
+        display: flex;
+        gap: 10px;
+    }
+    .edit-btn-cancel {
+        flex: 1;
+        padding: 12px;
+        border: 1px solid rgba(0, 0, 0, 0.06);
+        border-radius: 50px;
+        background: white;
+        font-family: 'Poppins', sans-serif;
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--text-soft);
+        cursor: pointer;
+        transition: 0.2s;
+    }
+    .edit-btn-cancel:active:not(:disabled) {
+        transform: scale(0.98);
+        background: #f5f5f5;
+    }
+    .edit-btn-save {
+        flex: 1;
+        padding: 12px;
+        border: none;
+        border-radius: 50px;
+        background: var(--accent-primary, #6366f1);
+        font-family: 'Poppins', sans-serif;
+        font-size: 14px;
+        font-weight: 600;
+        color: white;
+        cursor: pointer;
+        transition: 0.2s;
+    }
+    .edit-btn-save:active:not(:disabled) {
+        transform: scale(0.98);
+        opacity: 0.9;
+    }
+    .edit-btn-save:disabled,
+    .edit-btn-cancel:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
     }
 </style>

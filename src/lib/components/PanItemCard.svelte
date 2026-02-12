@@ -16,10 +16,12 @@
 		item,
 		onMarkEmptied,
 		onRemove,
+		onEdit,
 	}: {
 		item: PanItem;
 		onMarkEmptied?: (id: number) => void;
 		onRemove?: (id: number) => void;
+		onEdit?: (id: number) => void;
 	} = $props();
 
 	let percentage = $derived(
@@ -29,6 +31,11 @@
 </script>
 
 <div class="pan-item-card">
+	{#if onEdit}
+		<button class="edit-btn" onclick={() => onEdit(item.id)} aria-label={t.panProject.editQuantity}>
+			<i class="ri-pencil-line"></i>
+		</button>
+	{/if}
 	{#if onRemove}
 		<button class="remove-btn" onclick={() => onRemove(item.id)} aria-label={t.panProject.removeItem}>
 			<i class="ri-close-line"></i>
@@ -86,6 +93,31 @@
 
 	.pan-item-card:active {
 		transform: scale(0.98);
+	}
+
+	.edit-btn {
+		position: absolute;
+		top: 12px;
+		right: 44px;
+		width: 28px;
+		height: 28px;
+		border: none;
+		border-radius: 50%;
+		background: rgba(0, 0, 0, 0.05);
+		color: var(--text-soft);
+		font-size: 16px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		cursor: pointer;
+		transition: 0.2s;
+		padding: 0;
+	}
+
+	.edit-btn:active {
+		background: rgba(99, 102, 241, 0.15);
+		color: var(--accent-primary, #6366f1);
+		transform: scale(0.9);
 	}
 
 	.remove-btn {

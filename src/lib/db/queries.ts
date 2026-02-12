@@ -2,7 +2,7 @@ import { getDb } from './client';
 import { CREATE_TABLES, SEED_DATA, SEED_SUBCATEGORIES, ACHIEVEMENT_DEFINITIONS, USER_ID_INDEXES } from './schema';
 import type { InStatement } from './client';
 
-const CURRENT_SCHEMA_VERSION = 5;
+const CURRENT_SCHEMA_VERSION = 6;
 
 // --- Helpers ---
 
@@ -112,6 +112,26 @@ export async function initializeDatabase(): Promise<void> {
 			await db.execute(`DROP TABLE monthly_stats`);
 			await db.execute(`ALTER TABLE monthly_stats_v4 RENAME TO monthly_stats`);
 		} catch { /* already migrated or fresh install */ }
+	}
+
+	// v6: Add name column to budgets (safe ALTER TABLE — no DROP)
+	if (currentVersion < 6) {
+		// Recovery: if a previous broken migration left budgets_v6 but dropped budgets
+		try {
+			await db.execute("SELECT 1 FROM budgets LIMIT 0");
+		} catch {
+			// budgets table missing — check for leftover budgets_v6 from failed migration
+			try {
+				await db.execute("SELECT 1 FROM budgets_v6 LIMIT 0");
+				await db.execute("ALTER TABLE budgets_v6 RENAME TO budgets");
+			} catch {
+				// Neither table exists — CREATE_TABLES above already created it
+			}
+		}
+		// Now safely add the name column if missing
+		try {
+			await db.execute("ALTER TABLE budgets ADD COLUMN name TEXT");
+		} catch { /* column already exists */ }
 	}
 
 	// v4: Migrate existing user_profile to users table if registered
@@ -233,12 +253,14 @@ export interface Challenge {
 
 export interface Budget {
 	id: number;
-	category_id: number;
+	name: string | null;
+	category_id: number | null;
 	monthly_limit: number;
 	spent: number;
 	month: string;
 	carryover: number;
 	carryover_amount: number;
+	display_name: string;
 	category_name?: string;
 	category_icon?: string;
 	actual_spent?: number;
@@ -601,6 +623,31 @@ export async function updateItem(
 	});
 }
 
+export async function deleteItem(userId: number, id: number): Promise<void> {
+	const db = getDb();
+	// Clean up all FK references before deleting the item
+	await db.execute({
+		sql: "DELETE FROM usage_log WHERE item_id = ? AND user_id = ?",
+		args: [id, userId]
+	});
+	await db.execute({
+		sql: "DELETE FROM declutter_log WHERE item_id = ? AND user_id = ?",
+		args: [id, userId]
+	});
+	await db.execute({
+		sql: "DELETE FROM pan_project_items WHERE item_id = ? AND user_id = ?",
+		args: [id, userId]
+	});
+	await db.execute({
+		sql: "UPDATE purchases SET item_id = NULL WHERE item_id = ? AND user_id = ?",
+		args: [id, userId]
+	});
+	await db.execute({
+		sql: "DELETE FROM items WHERE id = ? AND user_id = ?",
+		args: [id, userId]
+	});
+}
+
 export async function markItemUsedUp(userId: number, id: number): Promise<void> {
 	const db = getDb();
 	await db.execute({
@@ -764,6 +811,43 @@ export async function getAllLastPurchaseDates(userId: number): Promise<Record<nu
 		if (row.last_date) map[row.category_id as number] = row.last_date as string;
 	}
 	return map;
+}
+
+export async function updatePurchase(
+	userId: number,
+	id: number,
+	updates: Partial<{
+		name: string;
+		amount: number;
+		category_id: number;
+		purchase_date: string;
+		notes: string | null;
+	}>
+): Promise<void> {
+	const db = getDb();
+	const fields: string[] = [];
+	const args: (string | number | null)[] = [];
+
+	for (const [key, value] of Object.entries(updates)) {
+		fields.push(`${key} = ?`);
+		args.push(value as string | number | null);
+	}
+
+	if (fields.length === 0) return;
+	args.push(id, userId);
+
+	await db.execute({
+		sql: `UPDATE purchases SET ${fields.join(', ')} WHERE id = ? AND user_id = ?`,
+		args
+	});
+}
+
+export async function deletePurchase(userId: number, id: number): Promise<void> {
+	const db = getDb();
+	await db.execute({
+		sql: 'DELETE FROM purchases WHERE id = ? AND user_id = ?',
+		args: [id, userId]
+	});
 }
 
 // --- Usage Log ---
@@ -976,20 +1060,23 @@ export async function getBudgets(userId: number, month?: string): Promise<Budget
 	const db = getDb();
 	const currentMonth = month || new Date().toISOString().slice(0, 7);
 	const result = await db.execute({
-		sql: `SELECT b.*, c.name as category_name, c.icon as category_icon
-			FROM budgets b JOIN categories c ON b.category_id = c.id
+		sql: `SELECT b.*, c.name as category_name, c.icon as category_icon,
+			COALESCE(b.name, c.name, 'Budget') as display_name
+			FROM budgets b LEFT JOIN categories c ON b.category_id = c.id
 			WHERE b.month = ? AND b.user_id = ? ORDER BY b.id`,
 		args: [currentMonth, userId]
 	});
 	return result.rows.map((row) => ({
 		id: row.id as number,
-		category_id: row.category_id as number,
+		name: (row.name as string) ?? null,
+		category_id: (row.category_id as number) ?? null,
 		monthly_limit: row.monthly_limit as number,
 		spent: row.spent as number,
 		month: row.month as string,
 		carryover: (row.carryover as number) ?? 0,
 		carryover_amount: (row.carryover_amount as number) ?? 0,
-		category_name: row.category_name as string,
+		display_name: row.display_name as string,
+		category_name: (row.category_name as string) ?? undefined,
 		category_icon: (row.category_icon as string) ?? undefined
 	}));
 }
@@ -999,22 +1086,25 @@ export async function getBudgetWithSpending(userId: number, month?: string): Pro
 	const currentMonth = month || new Date().toISOString().slice(0, 7);
 	const result = await db.execute({
 		sql: `SELECT b.*, c.name as category_name, c.icon as category_icon,
+			COALESCE(b.name, c.name, 'Budget') as display_name,
 			COALESCE((SELECT SUM(p.amount) FROM purchases p
 				WHERE p.category_id = b.category_id AND p.user_id = ?
 				AND strftime('%Y-%m', p.purchase_date) = b.month), 0) as actual_spent
-			FROM budgets b JOIN categories c ON b.category_id = c.id
+			FROM budgets b LEFT JOIN categories c ON b.category_id = c.id
 			WHERE b.month = ? AND b.user_id = ? ORDER BY b.id`,
 		args: [userId, currentMonth, userId]
 	});
 	return result.rows.map((row) => ({
 		id: row.id as number,
-		category_id: row.category_id as number,
+		name: (row.name as string) ?? null,
+		category_id: (row.category_id as number) ?? null,
 		monthly_limit: row.monthly_limit as number,
 		spent: row.spent as number,
 		month: row.month as string,
 		carryover: (row.carryover as number) ?? 0,
 		carryover_amount: (row.carryover_amount as number) ?? 0,
-		category_name: row.category_name as string,
+		display_name: row.display_name as string,
+		category_name: (row.category_name as string) ?? undefined,
 		category_icon: (row.category_icon as string) ?? undefined,
 		actual_spent: row.actual_spent as number
 	}));
@@ -1022,17 +1112,34 @@ export async function getBudgetWithSpending(userId: number, month?: string): Pro
 
 export async function addBudget(
 	userId: number,
-	categoryId: number,
+	categoryId: number | null,
 	monthlyLimit: number,
 	month?: string,
-	carryover?: boolean
+	carryover?: boolean,
+	name?: string | null
 ): Promise<void> {
 	const db = getDb();
 	const m = month || new Date().toISOString().slice(0, 7);
-	await db.execute({
-		sql: 'INSERT INTO budgets (category_id, monthly_limit, month, carryover, user_id) VALUES (?, ?, ?, ?, ?)',
-		args: [categoryId, monthlyLimit, m, carryover ? 1 : 0, userId]
-	});
+	if (categoryId) {
+		await db.execute({
+			sql: 'INSERT INTO budgets (name, category_id, monthly_limit, month, carryover, user_id) VALUES (?, ?, ?, ?, ?, ?)',
+			args: [name ?? null, categoryId, monthlyLimit, m, carryover ? 1 : 0, userId]
+		});
+	} else {
+		// category_id may be NOT NULL on migrated databases — try without it first
+		try {
+			await db.execute({
+				sql: 'INSERT INTO budgets (name, monthly_limit, month, carryover, user_id) VALUES (?, ?, ?, ?, ?)',
+				args: [name ?? null, monthlyLimit, m, carryover ? 1 : 0, userId]
+			});
+		} catch {
+			// NOT NULL constraint — fall back to category_id = 1 (first category)
+			await db.execute({
+				sql: 'INSERT INTO budgets (name, category_id, monthly_limit, month, carryover, user_id) VALUES (?, ?, ?, ?, ?, ?)',
+				args: [name ?? null, 1, monthlyLimit, m, carryover ? 1 : 0, userId]
+			});
+		}
+	}
 }
 
 export async function updateBudgetSpent(userId: number, id: number, spent: number): Promise<void> {
@@ -1064,9 +1171,9 @@ export async function rolloverBudgets(userId: number): Promise<void> {
 
 		if (existing.rows.length === 0) {
 			await db.execute({
-				sql: `INSERT INTO budgets (category_id, monthly_limit, month, carryover, carryover_amount, user_id)
-					VALUES (?, ?, ?, 1, ?, ?)`,
-				args: [row.category_id as number, row.monthly_limit as number, currentMonth, remaining, userId]
+				sql: `INSERT INTO budgets (name, category_id, monthly_limit, month, carryover, carryover_amount, user_id)
+					VALUES (?, ?, ?, ?, 1, ?, ?)`,
+				args: [(row.name as string) ?? null, (row.category_id as number) ?? null, row.monthly_limit as number, currentMonth, remaining, userId]
 			});
 		}
 	}
@@ -1627,8 +1734,9 @@ export async function loadHomeData(userId: number): Promise<HomeData> {
 		// 2: challenges
 		{ sql: 'SELECT * FROM challenges WHERE user_id = ? ORDER BY created_at DESC', args: [userId] },
 		// 3: budgets
-		{ sql: `SELECT b.*, c.name as category_name, c.icon as category_icon
-			FROM budgets b JOIN categories c ON b.category_id = c.id
+		{ sql: `SELECT b.*, c.name as category_name, c.icon as category_icon,
+			COALESCE(b.name, c.name, 'Budget') as display_name
+			FROM budgets b LEFT JOIN categories c ON b.category_id = c.id
 			WHERE b.month = ? AND b.user_id = ? ORDER BY b.id`, args: [currentMonth, userId] },
 		// 4: stats - item counts
 		{ sql: `SELECT COUNT(*) as total,
@@ -1705,10 +1813,12 @@ export async function loadHomeData(userId: number): Promise<HomeData> {
 
 	// Parse budgets
 	const budgets: Budget[] = results[3].rows.map(r => ({
-		id: r.id as number, category_id: r.category_id as number,
+		id: r.id as number, name: (r.name as string) ?? null,
+		category_id: (r.category_id as number) ?? null,
 		monthly_limit: r.monthly_limit as number, spent: r.spent as number,
 		month: r.month as string, carryover: (r.carryover as number) ?? 0,
 		carryover_amount: (r.carryover_amount as number) ?? 0,
+		display_name: (r.display_name as string) ?? 'Budget',
 		category_name: (r.category_name as string) ?? undefined,
 		category_icon: (r.category_icon as string) ?? undefined
 	}));
@@ -1931,5 +2041,84 @@ export async function clearCheckedShoppingItems(userId: number): Promise<void> {
 	await db.execute({
 		sql: 'DELETE FROM shopping_list WHERE checked = 1 AND user_id = ?',
 		args: [userId]
+	});
+}
+
+export async function updateBudget(
+	userId: number,
+	id: number,
+	updates: Partial<{
+		name: string | null;
+		category_id: number | null;
+		monthly_limit: number;
+		carryover: boolean;
+	}>
+): Promise<void> {
+	const db = getDb();
+	const fields: string[] = [];
+	const args: (string | number | null)[] = [];
+
+	for (const [key, value] of Object.entries(updates)) {
+		if (key === 'carryover') {
+			fields.push('carryover = ?');
+			args.push(value ? 1 : 0);
+		} else if (key === 'category_id' && value === null) {
+			// Skip null category_id — may violate NOT NULL on migrated databases
+			continue;
+		} else {
+			fields.push(`${key} = ?`);
+			args.push(value as string | number | null);
+		}
+	}
+
+	if (fields.length === 0) return;
+	args.push(id, userId);
+
+	await db.execute({
+		sql: `UPDATE budgets SET ${fields.join(', ')} WHERE id = ? AND user_id = ?`,
+		args
+	});
+}
+
+export async function deleteBudget(userId: number, id: number): Promise<void> {
+	const db = getDb();
+	await db.execute({
+		sql: 'DELETE FROM budgets WHERE id = ? AND user_id = ?',
+		args: [id, userId]
+	});
+}
+
+export async function updateShoppingItem(
+	userId: number,
+	id: number,
+	updates: Partial<{
+		name: string;
+		quantity: number;
+		notes: string | null;
+	}>
+): Promise<void> {
+	const db = getDb();
+	const fields: string[] = [];
+	const args: (string | number | null)[] = [];
+
+	for (const [key, value] of Object.entries(updates)) {
+		fields.push(`${key} = ?`);
+		args.push(value as string | number | null);
+	}
+
+	if (fields.length === 0) return;
+	args.push(id, userId);
+
+	await db.execute({
+		sql: `UPDATE shopping_list SET ${fields.join(', ')} WHERE id = ? AND user_id = ?`,
+		args
+	});
+}
+
+export async function updatePanItem(userId: number, id: number, quantity: number): Promise<void> {
+	const db = getDb();
+	await db.execute({
+		sql: 'UPDATE pan_project_items SET quantity = ? WHERE id = ? AND user_id = ?',
+		args: [quantity, id, userId]
 	});
 }

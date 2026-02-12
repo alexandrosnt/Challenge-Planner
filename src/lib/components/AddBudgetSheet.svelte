@@ -3,6 +3,7 @@
 	import { getCategories, addBudget, type Category } from '$lib/db/queries';
 	import { getAuthState } from '$lib/stores/auth.svelte';
 	import { closeModal } from '$lib/stores/modal.svelte';
+	import { triggerRefresh } from '$lib/stores/refresh.svelte';
 	import { t } from '$lib/i18n/index.svelte';
 
 	let { onAdded }: { onAdded?: () => void } = $props();
@@ -10,6 +11,7 @@
 	let auth = getAuthState();
 
 	let categories: Category[] = $state([]);
+	let budgetName = $state('');
 	let categoryId = $state(0);
 	let monthlyLimit = $state('');
 	let month = $state(new Date().toISOString().slice(0, 7));
@@ -21,6 +23,7 @@
 	});
 
 	function resetForm() {
+		budgetName = '';
 		categoryId = 0;
 		monthlyLimit = '';
 		month = new Date().toISOString().slice(0, 7);
@@ -37,20 +40,22 @@
 	}
 
 	async function handleSubmit() {
-		if (!categoryId || !monthlyLimit) return;
+		if (!monthlyLimit) return;
 		const userId = auth.currentUser?.id;
 		if (!userId) return;
 		submitting = true;
 		try {
 			await addBudget(
 				userId,
-				categoryId,
+				categoryId > 0 ? categoryId : null,
 				Number(monthlyLimit),
 				month || undefined,
-				carryover
+				carryover,
+				budgetName.trim() || null
 			);
 			closeModal();
 			resetForm();
+			triggerRefresh();
 			onAdded?.();
 		} finally {
 			submitting = false;
@@ -76,9 +81,19 @@
 		<div class="sheet-body">
 			<form onsubmit={(e) => { e.preventDefault(); handleSubmit(); }}>
 				<div class="form-group">
-					<label for="budget-category">{t.common.category}</label>
-					<select id="budget-category" bind:value={categoryId} required>
-						<option value={0} disabled>{t.addModal.selectCategory}</option>
+					<label for="budget-name">{t.budgetPage.budgetName}</label>
+					<input
+						id="budget-name"
+						type="text"
+						bind:value={budgetName}
+						placeholder={t.budgetPage.budgetNamePlaceholder}
+					/>
+				</div>
+
+				<div class="form-group">
+					<label for="budget-category">{t.budgetPage.categoryOptional}</label>
+					<select id="budget-category" bind:value={categoryId}>
+						<option value={0}>{t.common.none}</option>
 						{#each categories as cat (cat.id)}
 							<option value={cat.id}>{cat.name}</option>
 						{/each}
@@ -201,7 +216,7 @@
 	.sheet-body {
 		flex: 1;
 		overflow-y: auto;
-		padding: 20px 20px 32px;
+		padding: 20px 20px calc(32px + env(safe-area-inset-bottom, 0px));
 		-ms-overflow-style: none;
 		scrollbar-width: none;
 	}

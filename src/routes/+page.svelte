@@ -1,6 +1,6 @@
 <script>
-    import { onMount } from 'svelte';
     import Header from '$lib/components/Header.svelte';
+    import { getRefreshSignal } from '$lib/stores/refresh.svelte';
     import HeroStats from '$lib/components/HeroStats.svelte';
     import CategoryPills from '$lib/components/CategoryPills.svelte';
     import SectionTitle from '$lib/components/SectionTitle.svelte';
@@ -54,6 +54,8 @@
     let wishlist = $state([]);
     /** @type {import('$lib/db/queries').Item[]} */
     let items = $state([]);
+
+    let refresh = getRefreshSignal();
 
     let weatherCity = $state('');
     let weatherTemp = $state(null);
@@ -129,7 +131,8 @@
         }
     }
 
-    onMount(() => {
+    $effect(() => {
+        refresh.value;
         const userId = auth.currentUser?.id;
         if (!userId) return;
         // Load DB data and weather in parallel
