@@ -100,6 +100,14 @@ async fn execute_stmt(
     })
 }
 
+fn normalize_turso_url(url: &str) -> String {
+    if url.starts_with("libsql://") {
+        url.replacen("libsql://", "https://", 1)
+    } else {
+        url.to_string()
+    }
+}
+
 #[tauri::command]
 pub async fn db_init(
     url: Option<String>,
@@ -119,31 +127,45 @@ pub async fn db_init(
         (Some(u), Some(t)) if !u.is_empty() && !t.is_empty()
     );
 
-    // Try remote replica first; if it fails (no internet, stale state, etc.)
-    // fall back to local-only so the app always works offline.
     let db = if is_remote {
-        match Builder::new_remote_replica(
-            &path_str,
-            url.clone().unwrap(),
-            auth_token.clone().unwrap(),
-        )
-        .build()
-        .await
-        {
-            Ok(db) => db,
-            Err(e) => {
-                let err_msg = e.to_string();
-                log::warn!("Remote replica failed, falling back to local: {}", err_msg);
+        let remote_url = normalize_turso_url(url.as_deref().unwrap());
+        let token = auth_token.clone().unwrap();
 
-                // If stale metadata, wipe files first
-                if err_msg.contains("metadata") {
-                    for suffix in &["", "-client_wal_index", "-shm", "-wal", "-metadata"] {
-                        let mut p = db_path.clone().into_os_string();
-                        p.push(suffix);
-                        let _ = std::fs::remove_file(&p);
+        // Retry remote replica up to 3 times — mobile network may not be ready at launch
+        let mut last_err = String::new();
+        let mut db_opt: Option<Database> = None;
+        for attempt in 1..=3 {
+            // Wipe stale metadata files before each attempt
+            for suffix in &["-client_wal_index", "-shm", "-wal", "-metadata"] {
+                let mut p = db_path.clone().into_os_string();
+                p.push(suffix);
+                let _ = std::fs::remove_file(&p);
+            }
+
+            match Builder::new_remote_replica(&path_str, remote_url.clone(), token.clone())
+                .read_your_writes(true)
+                .build()
+                .await
+            {
+                Ok(db) => {
+                    log::info!("Remote replica connected (attempt {})", attempt);
+                    db_opt = Some(db);
+                    break;
+                }
+                Err(e) => {
+                    last_err = e.to_string();
+                    log::warn!("Remote replica attempt {} failed: {}", attempt, last_err);
+                    if attempt < 3 {
+                        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
                     }
                 }
+            }
+        }
 
+        match db_opt {
+            Some(db) => db,
+            None => {
+                log::error!("All remote replica attempts failed: {}. Falling back to local.", last_err);
                 Builder::new_local(&path_str)
                     .build()
                     .await
@@ -159,10 +181,11 @@ pub async fn db_init(
 
     let conn = db.connect().map_err(|e| e.to_string())?;
 
-    // If remote replica, try initial sync (non-fatal if offline)
+    // If remote replica, try initial sync to pull cloud data
     if is_remote {
-        if let Err(e) = db.sync().await {
-            log::warn!("Initial sync failed (will work offline): {}", e);
+        match db.sync().await {
+            Ok(rep) => log::info!("Initial sync: {} frames", rep.frames_synced()),
+            Err(e) => log::warn!("Initial sync failed: {}", e),
         }
     }
 
