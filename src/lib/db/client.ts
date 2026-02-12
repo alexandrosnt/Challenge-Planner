@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
+import { syncAfterWrite } from './sync';
 
 export interface ResultSet {
 	columns: string[];
@@ -53,20 +54,25 @@ function normalizeStmt(s: InStatement): { sql: string; args: unknown[] } {
 	return typeof s === 'string' ? { sql: s, args: [] } : { sql: s.sql, args: s.args ?? [] };
 }
 
+function isWrite(sql: string): boolean {
+	const cmd = sql.trimStart().substring(0, 6).toUpperCase();
+	return cmd.startsWith('INSERT') || cmd.startsWith('UPDATE') || cmd.startsWith('DELETE') || cmd.startsWith('ALTER');
+}
+
 const client = {
 	async execute(stmt: InStatement): Promise<ResultSet> {
 		const { sql, args } = normalizeStmt(stmt);
 		const raw = await invoke<RawResult>('db_execute', { sql, args });
+		if (isWrite(sql)) syncAfterWrite();
 		return toResultSet(raw);
 	},
 
 	async batch(stmts: InStatement[], _mode?: string): Promise<ResultSet[]> {
+		const normalized = stmts.map((s) => normalizeStmt(s));
 		const raw = await invoke<RawResult[]>('db_batch', {
-			statements: stmts.map((s) => {
-				const { sql, args } = normalizeStmt(s);
-				return { sql, args };
-			})
+			statements: normalized.map(({ sql, args }) => ({ sql, args }))
 		});
+		if (normalized.some(({ sql }) => isWrite(sql))) syncAfterWrite();
 		return raw.map(toResultSet);
 	}
 };
