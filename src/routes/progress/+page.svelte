@@ -4,7 +4,7 @@
     import ProgressRing from '$lib/components/ProgressRing.svelte';
     import ProgressBar from '$lib/components/ProgressBar.svelte';
     import SectionTitle from '$lib/components/SectionTitle.svelte';
-    import { loadProgressData, type ProgressData } from '$lib/db/queries';
+    import { loadProgressData, getPanProjectStats, type ProgressData, type PanProjectStats } from '$lib/db/queries';
     import { getAuthState } from '$lib/stores/auth.svelte';
     import { goto } from '$app/navigation';
     import { t } from '$lib/i18n/index.svelte';
@@ -12,6 +12,7 @@
     let auth = getAuthState();
 
     let data = $state<ProgressData | null>(null);
+    let panStats = $state<PanProjectStats | null>(null);
 
     let usableItems = $derived(data ? data.active_items + data.used_up_items : 0);
     let completionRate = $derived(
@@ -20,9 +21,9 @@
             : 0
     );
 
-    let challengeRate = $derived(
-        data && data.challenges_total > 0
-            ? Math.round((data.challenges_completed / data.challenges_total) * 100)
+    let panRate = $derived(
+        panStats && panStats.total > 0
+            ? Math.round((panStats.emptied / panStats.total) * 100)
             : 0
     );
 
@@ -36,7 +37,10 @@
         const userId = auth.currentUser?.id;
         if (!userId) return;
         try {
-            data = await loadProgressData(userId);
+            [data, panStats] = await Promise.all([
+                loadProgressData(userId),
+                getPanProjectStats(userId)
+            ]);
         } catch (e) {
             console.error('Failed to load progress data:', e);
         }
@@ -45,11 +49,7 @@
 
 <!-- Header -->
 <header class="page-header">
-    <button class="back-btn" aria-label="Go back" onclick={() => goto('/')}>
-        <i class="ri-arrow-left-s-line"></i>
-    </button>
     <h1 class="page-title">{t.progress.title}</h1>
-    <div class="header-spacer"></div>
 </header>
 
 <main>
@@ -150,18 +150,18 @@
             </GlassCard>
         {/if}
 
-        <!-- Challenges & Achievements -->
+        <!-- Pan Project & Achievements -->
         <SectionTitle title={t.progress.milestones} actionText="" />
         <div class="milestones-row">
             <GlassCard style="flex: 1; text-align: center;">
                 <ProgressRing
-                    value={challengeRate}
+                    value={panRate}
                     size={64}
                     strokeWidth={5}
                     color="var(--accent-pink)"
                 />
-                <p class="milestone-value">{data.challenges_completed}/{data.challenges_total}</p>
-                <p class="milestone-label">{t.progress.challenges}</p>
+                <p class="milestone-value">{panStats?.emptied ?? 0}/{panStats?.total ?? 0}</p>
+                <p class="milestone-label">{t.panProject.title}</p>
             </GlassCard>
             <GlassCard style="flex: 1; text-align: center;">
                 <ProgressRing
@@ -258,37 +258,14 @@
     .page-header {
         display: flex;
         align-items: center;
-        justify-content: space-between;
-        padding: 16px 24px;
-    }
-    .back-btn {
-        width: 40px;
-        height: 40px;
-        border-radius: 50%;
-        border: none;
-        background: var(--glass-bg);
-        backdrop-filter: blur(8px);
-        -webkit-backdrop-filter: blur(8px);
-        display: flex;
-        align-items: center;
         justify-content: center;
-        font-size: 22px;
-        color: var(--text-dark);
-        cursor: pointer;
-        box-shadow: var(--glass-shadow);
-        transition: transform 0.2s;
-    }
-    .back-btn:active {
-        transform: scale(0.9);
+        padding: 20px 24px;
     }
     .page-title {
         font-size: 20px;
         font-weight: 700;
         color: var(--text-dark);
         letter-spacing: -0.3px;
-    }
-    .header-spacer {
-        width: 40px;
     }
 
     /* Hero Ring */

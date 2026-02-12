@@ -2,7 +2,7 @@ import { getDb } from './client';
 import { CREATE_TABLES, SEED_DATA, SEED_SUBCATEGORIES, ACHIEVEMENT_DEFINITIONS, USER_ID_INDEXES } from './schema';
 import type { InStatement } from './client';
 
-const CURRENT_SCHEMA_VERSION = 4;
+const CURRENT_SCHEMA_VERSION = 5;
 
 // --- Helpers ---
 
@@ -1790,4 +1790,146 @@ export async function loadHomeData(userId: number): Promise<HomeData> {
 	});
 
 	return { profile, categories, challenges, budgets, stats, streaks, activity, wishlist, items };
+}
+
+// --- Pan Project ---
+
+export interface PanProjectItem {
+	id: number;
+	item_id: number;
+	quantity: number;
+	emptied: number;
+	created_at: string;
+	item_name: string;
+	category_name: string;
+	category_icon: string;
+}
+
+export interface PanProjectStats {
+	total: number;
+	emptied: number;
+}
+
+export async function addPanItem(userId: number, itemId: number, quantity: number): Promise<void> {
+	const db = getDb();
+	await db.execute({
+		sql: 'INSERT INTO pan_project_items (item_id, quantity, user_id) VALUES (?, ?, ?)',
+		args: [itemId, quantity, userId]
+	});
+}
+
+export async function getPanItems(userId: number): Promise<PanProjectItem[]> {
+	const db = getDb();
+	const result = await db.execute({
+		sql: `SELECT pp.*, i.name as item_name, c.name as category_name, c.icon as category_icon
+			FROM pan_project_items pp
+			JOIN items i ON pp.item_id = i.id
+			JOIN categories c ON i.category_id = c.id
+			WHERE pp.user_id = ?
+			ORDER BY pp.created_at DESC`,
+		args: [userId]
+	});
+	return result.rows.map(r => ({
+		id: r.id as number,
+		item_id: r.item_id as number,
+		quantity: r.quantity as number,
+		emptied: r.emptied as number,
+		created_at: r.created_at as string,
+		item_name: r.item_name as string,
+		category_name: r.category_name as string,
+		category_icon: r.category_icon as string
+	}));
+}
+
+export async function markPanItemEmptied(panItemId: number): Promise<void> {
+	const db = getDb();
+	await db.execute({
+		sql: 'UPDATE pan_project_items SET emptied = MIN(emptied + 1, quantity) WHERE id = ?',
+		args: [panItemId]
+	});
+}
+
+export async function removePanItem(userId: number, panItemId: number): Promise<void> {
+	const db = getDb();
+	await db.execute({
+		sql: 'DELETE FROM pan_project_items WHERE id = ? AND user_id = ?',
+		args: [panItemId, userId]
+	});
+}
+
+export async function getPanProjectStats(userId: number): Promise<PanProjectStats> {
+	const db = getDb();
+	const result = await db.execute({
+		sql: `SELECT COALESCE(SUM(quantity), 0) as total, COALESCE(SUM(emptied), 0) as emptied
+			FROM pan_project_items WHERE user_id = ?`,
+		args: [userId]
+	});
+	return {
+		total: result.rows[0].total as number,
+		emptied: result.rows[0].emptied as number
+	};
+}
+
+// --- Shopping List ---
+
+export interface ShoppingItem {
+	id: number;
+	name: string;
+	quantity: number;
+	checked: number;
+	notes: string | null;
+	created_at: string;
+}
+
+export async function addShoppingItem(
+	userId: number,
+	name: string,
+	quantity?: number,
+	notes?: string | null
+): Promise<void> {
+	const db = getDb();
+	await db.execute({
+		sql: 'INSERT INTO shopping_list (name, quantity, notes, user_id) VALUES (?, ?, ?, ?)',
+		args: [name, quantity ?? 1, notes ?? null, userId]
+	});
+}
+
+export async function getShoppingList(userId: number): Promise<ShoppingItem[]> {
+	const db = getDb();
+	const result = await db.execute({
+		sql: 'SELECT * FROM shopping_list WHERE user_id = ? ORDER BY checked ASC, created_at DESC',
+		args: [userId]
+	});
+	return result.rows.map(r => ({
+		id: r.id as number,
+		name: r.name as string,
+		quantity: r.quantity as number,
+		checked: r.checked as number,
+		notes: (r.notes as string) ?? null,
+		created_at: r.created_at as string
+	}));
+}
+
+export async function toggleShoppingItem(userId: number, id: number): Promise<void> {
+	const db = getDb();
+	await db.execute({
+		sql: 'UPDATE shopping_list SET checked = CASE WHEN checked = 0 THEN 1 ELSE 0 END WHERE id = ? AND user_id = ?',
+		args: [id, userId]
+	});
+}
+
+export async function deleteShoppingItem(userId: number, id: number): Promise<void> {
+	const db = getDb();
+	await db.execute({
+		sql: 'DELETE FROM shopping_list WHERE id = ? AND user_id = ?',
+		args: [id, userId]
+	});
+}
+
+export async function clearCheckedShoppingItems(userId: number): Promise<void> {
+	const db = getDb();
+	await db.execute({
+		sql: 'DELETE FROM shopping_list WHERE checked = 1 AND user_id = ?',
+		args: [userId]
+	});
 }

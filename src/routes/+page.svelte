@@ -4,7 +4,6 @@
     import HeroStats from '$lib/components/HeroStats.svelte';
     import CategoryPills from '$lib/components/CategoryPills.svelte';
     import SectionTitle from '$lib/components/SectionTitle.svelte';
-    import ChallengeCard from '$lib/components/ChallengeCard.svelte';
     import BudgetAlert from '$lib/components/BudgetAlert.svelte';
     import ActivityFeed from '$lib/components/ActivityFeed.svelte';
     import WishlistCard from '$lib/components/WishlistCard.svelte';
@@ -30,12 +29,11 @@
     let displayName = $derived(auth.isAuthenticated && auth.currentUser?.name ? auth.currentUser.name : 'there');
     import {
         loadHomeData,
-        getChallenges,
-        updateChallengeProgress,
         getWishlist,
         markWishlistPurchased,
         deleteWishlistItem,
-        checkAchievements
+        checkAchievements,
+        getPanProjectStats,
     } from '$lib/db/queries';
     import { goto } from '$app/navigation';
 
@@ -43,10 +41,9 @@
     let profile = $state(null);
     /** @type {import('$lib/db/queries').Category[]} */
     let categories = $state([]);
-    /** @type {import('$lib/db/queries').Challenge[]} */
-    let challenges = $state([]);
     /** @type {import('$lib/db/queries').Budget[]} */
     let budgets = $state([]);
+    let panStats = $state(/** @type {{ total: number; emptied: number } | null} */ (null));
     /** @type {import('$lib/db/queries').ComputedStats | null} */
     let stats = $state(null);
     /** @type {import('$lib/db/queries').Streak[]} */
@@ -62,8 +59,8 @@
     let weatherTemp = $state(null);
     let weatherIcon = $state('');
 
-    let activeChallenges = $derived(challenges.filter(c => c.completed < c.total).slice(0, 2));
     let activeStreaks = $derived(streaks.filter(s => s.active).slice(0, 3));
+    let panPct = $derived(panStats && panStats.total > 0 ? Math.round((panStats.emptied / panStats.total) * 100) : 0);
     let readyWishlist = $derived(wishlist.filter(w => (w.days_remaining ?? 0) === 0));
     let alertBudgets = $derived(budgets.filter(b => b.spent / b.monthly_limit > 0.8));
 
@@ -139,7 +136,6 @@
         loadHomeData(userId).then(data => {
             profile = data.profile;
             categories = data.categories;
-            challenges = data.challenges;
             budgets = data.budgets;
             stats = data.stats;
             streaks = data.streaks;
@@ -149,6 +145,8 @@
             checkAchievements(userId).catch(() => {});
         }).catch(e => console.error('Failed to load home data:', e));
 
+        getPanProjectStats(userId).then(s => { panStats = s; }).catch(() => {});
+
         fetchWeather();
     });
 
@@ -156,17 +154,8 @@
         { icon: 'ri-add-circle-line', label: t.home.addItem, action: () => openAddModal() },
         { icon: 'ri-delete-bin-line', label: t.home.declutter, action: () => goto('/declutter') },
         { icon: 'ri-archive-drawer-line', label: t.home.inventory, action: () => goto('/inventory') },
-        { icon: 'ri-line-chart-line', label: t.home.insights, action: () => goto('/insights') },
+        { icon: 'ri-flask-line', label: t.nav.panProject, action: () => goto('/pan-project') },
     ];
-
-    /** @param {import('$lib/db/queries').Challenge} challenge */
-    async function handleChallengeIncrement(challenge) {
-        const userId = auth.currentUser?.id;
-        if (!userId) return;
-        const newCompleted = Math.min(challenge.completed + 1, challenge.total);
-        await updateChallengeProgress(userId, challenge.id, newCompleted);
-        challenges = await getChallenges(userId);
-    }
 
     /** @param {import('$lib/db/queries').WishlistItem} item */
     async function handleWishlistPurchase(item) {
@@ -255,7 +244,7 @@
 
     <!-- Active Streaks Highlight -->
     {#if activeStreaks.length > 0}
-        <SectionTitle title={t.home.activeStreaks} actionText={t.common.viewAll} onAction={() => goto('/projects')} />
+        <SectionTitle title={t.home.activeStreaks} actionText={t.common.viewAll} onAction={() => goto('/progress')} />
         <div class="streaks-compact" use:dragscroll>
             {#each activeStreaks as streak (streak.id)}
                 <GlassCard style="padding: 14px;">
@@ -269,20 +258,21 @@
         </div>
     {/if}
 
-    <!-- Top Challenges -->
-    {#if activeChallenges.length > 0}
-        <SectionTitle title={t.home.currentFocus} actionText={t.common.viewAll} onAction={() => goto('/projects')} />
-        {#each activeChallenges as challenge (challenge.id)}
-            <ChallengeCard
-                title={challenge.title}
-                icon={challenge.icon}
-                tag={challenge.tag}
-                completed={challenge.completed}
-                total={challenge.total}
-                deadline={challenge.deadline}
-                onIncrement={() => handleChallengeIncrement(challenge)}
-            />
-        {/each}
+    <!-- Pan Project Summary -->
+    {#if panStats && panStats.total > 0}
+        <SectionTitle title={t.home.currentFocus} actionText={t.common.viewAll} onAction={() => goto('/pan-project')} />
+        <button class="progress-card" onclick={() => goto('/pan-project')}>
+            <GlassCard style="margin-bottom: 16px; padding: 16px 20px;">
+                <div class="progress-card-inner">
+                    <ProgressRing value={panPct} size={48} strokeWidth={4} />
+                    <div class="progress-card-text">
+                        <span class="progress-card-title">{t.panProject.title}</span>
+                        <span class="progress-card-sub">{panStats.emptied} {t.panProject.of} {panStats.total} {t.panProject.emptied}</span>
+                    </div>
+                    <i class="ri-arrow-right-s-line progress-card-arrow"></i>
+                </div>
+            </GlassCard>
+        </button>
     {/if}
 
     <!-- Budget Alerts -->

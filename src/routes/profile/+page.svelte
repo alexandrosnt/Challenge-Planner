@@ -1,7 +1,9 @@
 <script>
     import GlassCard from '$lib/components/GlassCard.svelte';
+    import SectionTitle from '$lib/components/SectionTitle.svelte';
+    import AchievementBadge from '$lib/components/AchievementBadge.svelte';
     import LoginForm from '$lib/components/LoginForm.svelte';
-    import { getUserProfile, updateUserProfile, getItems, getChallenges, getComputedStats } from '$lib/db/queries';
+    import { getUserProfile, updateUserProfile, getComputedStats, getAchievements, checkAchievements } from '$lib/db/queries';
     import { getAuthState, logout } from '$lib/stores/auth.svelte';
     import { onMount } from 'svelte';
     import { t, getLocale, setLocale } from '$lib/i18n/index.svelte';
@@ -14,8 +16,10 @@
     let saving = $state(false);
     let saved = $state(false);
     let totalItems = $state(0);
-    let totalChallenges = $state(0);
     let usedUpItems = $state(0);
+    /** @type {import('$lib/db/queries').Achievement[]} */
+    let achievements = $state([]);
+    let unlockedCount = $derived(achievements.filter(a => a.unlocked).length);
 
     onMount(async () => {
         const userId = auth.currentUser?.id;
@@ -32,10 +36,8 @@
         totalItems = stats.total_items;
         usedUpItems = stats.used_up_items;
 
-        const challenges = await getChallenges(userId);
-        if (challenges) {
-            totalChallenges = challenges.length;
-        }
+        await checkAchievements(userId);
+        achievements = await getAchievements(userId);
     });
 
     async function handleSave() {
@@ -89,8 +91,8 @@
                     <p>{t.profile.usedUp}</p>
                 </div>
                 <div class="p-stat">
-                    <h3>{totalChallenges}</h3>
-                    <p>{t.profile.challenges}</p>
+                    <h3>{unlockedCount}</h3>
+                    <p>{t.progress.achievements}</p>
                 </div>
             </div>
         </GlassCard>
@@ -132,6 +134,16 @@
                 </select>
             </div>
         </GlassCard>
+
+        <!-- Achievements -->
+        {#if achievements.length > 0}
+            <SectionTitle title={t.progress.achievements} actionText="{unlockedCount}/{achievements.length}" />
+            <div class="achievements-grid">
+                {#each achievements as achievement (achievement.id)}
+                    <AchievementBadge {achievement} />
+                {/each}
+            </div>
+        {/if}
 
         <!-- Logout -->
         <button class="logout-btn" onclick={handleLogout}>
@@ -191,6 +203,12 @@
         justify-content: center; gap: 8px; transition: 0.2s;
     }
     .logout-btn:active { transform: scale(0.98); background: #f5f5f5; }
+    .achievements-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 16px;
+        margin-bottom: 24px;
+    }
     .app-info { text-align: center; }
     .app-info i { font-size: 24px; margin-bottom: 8px; }
     .app-info p { font-size: 14px; font-weight: 500; }

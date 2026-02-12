@@ -1,41 +1,71 @@
-<script>
+<script lang="ts">
 	import { page } from '$app/state';
-	import { openAddModal } from '$lib/stores/modal.svelte';
+	import { openModal, type ModalType } from '$lib/stores/modal.svelte';
 	import { t } from '$lib/i18n/index.svelte';
 
 	let currentPath = $derived(page.url.pathname);
 
-	const navItems = [
+	const leftNav = [
 		{ href: '/', icon: 'ri-home-5-fill', label: t.nav.home },
 		{ href: '/inventory', icon: 'ri-archive-drawer-line', label: t.nav.inventory },
-		{ icon: 'ri-add-line', label: t.nav.add, isCenter: true },
-		{ href: '/projects', icon: 'ri-trophy-line', label: t.nav.projects },
-		{ href: '/insights', icon: 'ri-line-chart-line', label: t.nav.insights },
+		{ href: '/pan-project', icon: 'ri-flask-line', label: t.nav.panProject },
 	];
+
+	const rightNav = [
+		{ href: '/budget', icon: 'ri-wallet-3-line', label: t.nav.budget },
+		{ href: '/declutter', icon: 'ri-delete-bin-line', label: t.nav.declutter },
+		{ href: '/shopping', icon: 'ri-shopping-cart-2-line', label: t.nav.shopping },
+	];
+
+	// Map each route to which modal the + button opens
+	const addButtonMap: Record<string, ModalType> = {
+		'/inventory': 'add-item',
+		'/pan-project': 'inventory-picker-pan',
+		'/budget': 'add-budget',
+		'/declutter': 'inventory-picker-declutter',
+		'/shopping': 'add-shopping-item',
+	};
+
+	let addDisabled = $derived(!(currentPath in addButtonMap));
+
+	function handleAdd() {
+		const modalType = addButtonMap[currentPath];
+		if (modalType) openModal(modalType);
+	}
 </script>
 
 <nav class="dock-container">
 	<div class="dock">
-		{#each navItems as item (item.label)}
-			{#if item.isCenter}
-				<div class="add-btn-wrapper">
-					<button
-						class="add-btn"
-						aria-label={item.label}
-						onclick={openAddModal}
-					>
-						<i class={item.icon}></i>
-					</button>
-				</div>
-			{:else}
-				<a
-					href={item.href}
-					class="nav-btn {currentPath === item.href ? 'active' : ''}"
-					aria-label={item.label}
-				>
-					<i class={item.icon}></i>
-				</a>
-			{/if}
+		{#each leftNav as item (item.href)}
+			<a
+				href={item.href}
+				class="nav-btn {currentPath === item.href ? 'active' : ''}"
+				aria-label={item.label}
+			>
+				<i class={item.icon}></i>
+			</a>
+		{/each}
+
+		<div class="add-btn-wrapper">
+			<button
+				class="add-btn"
+				class:disabled={addDisabled}
+				aria-label={t.nav.add}
+				onclick={handleAdd}
+				disabled={addDisabled}
+			>
+				<i class="ri-add-line"></i>
+			</button>
+		</div>
+
+		{#each rightNav as item (item.href)}
+			<a
+				href={item.href}
+				class="nav-btn {currentPath === item.href ? 'active' : ''}"
+				aria-label={item.label}
+			>
+				<i class={item.icon}></i>
+			</a>
 		{/each}
 	</div>
 </nav>
@@ -44,8 +74,8 @@
 	.dock-container {
 		position: fixed;
 		bottom: 30px;
-		left: 24px;
-		right: 24px;
+		left: 12px;
+		right: 12px;
 		display: flex;
 		justify-content: center;
 		z-index: 100;
@@ -54,12 +84,12 @@
 	.dock {
 		background: rgba(255, 255, 255, 0.9);
 		backdrop-filter: blur(20px);
-		padding: 12px 30px;
+		padding: 10px 16px;
 		border-radius: 40px;
 		box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08);
 		display: flex;
 		align-items: center;
-		gap: 30px;
+		gap: 14px;
 		border: 1px solid rgba(255, 255, 255, 1);
 	}
 
@@ -67,7 +97,7 @@
 		border: none;
 		background: none;
 		color: #c1c1c1;
-		font-size: 24px;
+		font-size: 22px;
 		position: relative;
 		transition: 0.3s;
 		text-decoration: none;
@@ -84,7 +114,7 @@
 	.nav-btn.active::after {
 		content: '';
 		position: absolute;
-		bottom: -8px;
+		bottom: -6px;
 		left: 50%;
 		transform: translateX(-50%);
 		width: 4px;
@@ -95,12 +125,12 @@
 
 	.add-btn-wrapper {
 		position: relative;
-		top: -25px;
+		top: -22px;
 	}
 
 	.add-btn {
-		width: 60px;
-		height: 60px;
+		width: 52px;
+		height: 52px;
 		background: var(--primary-gradient);
 		border-radius: 50%;
 		border: 4px solid #fff;
@@ -108,13 +138,23 @@
 		align-items: center;
 		justify-content: center;
 		color: white;
-		font-size: 28px;
+		font-size: 26px;
 		box-shadow: 0 10px 25px rgba(255, 107, 129, 0.4);
 		cursor: pointer;
-		transition: transform 0.2s;
+		transition: transform 0.2s, opacity 0.2s;
 	}
 
 	.add-btn:active {
 		transform: scale(0.9);
+	}
+
+	.add-btn.disabled {
+		opacity: 0.35;
+		cursor: default;
+		box-shadow: none;
+	}
+
+	.add-btn.disabled:active {
+		transform: none;
 	}
 </style>

@@ -1,19 +1,24 @@
-<script>
+<script lang="ts">
 	import '../app.css';
 	import BottomDock from '$lib/components/BottomDock.svelte';
-	import AddModal from '$lib/components/AddModal.svelte';
+	import AddItemSheet from '$lib/components/AddItemSheet.svelte';
+	import AddBudgetSheet from '$lib/components/AddBudgetSheet.svelte';
+	import AddShoppingItemSheet from '$lib/components/AddShoppingItemSheet.svelte';
+	import InventoryPickerSheet from '$lib/components/InventoryPickerSheet.svelte';
 	import LoginForm from '$lib/components/LoginForm.svelte';
 	import LanguageWelcome from '$lib/components/LanguageWelcome.svelte';
 	import { initDb } from '$lib/db/client';
 	import { initializeDatabase } from '$lib/db/queries';
 	import { startSync } from '$lib/db/sync';
 	import { checkSession, getAuthState } from '$lib/stores/auth.svelte';
+	import { getModalState } from '$lib/stores/modal.svelte';
 	import { onMount } from 'svelte';
 	import { t, initLocale } from '$lib/i18n/index.svelte';
 
 	let { children } = $props();
 
 	let auth = getAuthState();
+	let modal = getModalState();
 	let dbReady = $state(false);
 	let dbError = $state('');
 	let languageChosen = $state(false);
@@ -44,7 +49,19 @@
 	{#if auth.isAuthenticated}
 		{@render children()}
 		<BottomDock />
-		<AddModal />
+
+		<!-- Context-sensitive sheets -->
+		{#if modal.current === 'add-item'}
+			<AddItemSheet />
+		{:else if modal.current === 'add-budget'}
+			<AddBudgetSheet />
+		{:else if modal.current === 'add-shopping-item'}
+			<AddShoppingItemSheet />
+		{:else if modal.current === 'inventory-picker-pan'}
+			<InventoryPickerSheet mode="pan-project" />
+		{:else if modal.current === 'inventory-picker-declutter'}
+			<InventoryPickerSheet mode="declutter" />
+		{/if}
 	{:else if !auth.isLoading}
 		<main style="padding: 60px 24px;">
 			<LoginForm />

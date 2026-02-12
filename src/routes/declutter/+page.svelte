@@ -4,7 +4,6 @@
     import SectionTitle from '$lib/components/SectionTitle.svelte';
     import { loadDeclutterPageData, logDeclutter, checkAchievements, type DeclutterPageData, type DeclutterCandidate } from '$lib/db/queries';
     import { getAuthState } from '$lib/stores/auth.svelte';
-    import { goto } from '$app/navigation';
     import { t } from '$lib/i18n/index.svelte';
 
     let auth = getAuthState();
@@ -78,11 +77,7 @@
 
 <!-- Header -->
 <header class="page-header">
-    <button class="back-btn" aria-label="Go back" onclick={() => goto('/')}>
-        <i class="ri-arrow-left-s-line"></i>
-    </button>
     <h1 class="page-title">{t.declutter.title}</h1>
-    <div class="header-spacer"></div>
 </header>
 
 <main>
@@ -367,37 +362,14 @@
     .page-header {
         display: flex;
         align-items: center;
-        justify-content: space-between;
-        padding: 16px 24px;
-    }
-    .back-btn {
-        width: 40px;
-        height: 40px;
-        border-radius: 50%;
-        border: none;
-        background: var(--glass-bg);
-        backdrop-filter: blur(8px);
-        -webkit-backdrop-filter: blur(8px);
-        display: flex;
-        align-items: center;
         justify-content: center;
-        font-size: 22px;
-        color: var(--text-dark);
-        cursor: pointer;
-        box-shadow: var(--glass-shadow);
-        transition: transform 0.2s;
-    }
-    .back-btn:active {
-        transform: scale(0.9);
+        padding: 20px 24px;
     }
     .page-title {
         font-size: 20px;
         font-weight: 700;
         color: var(--text-dark);
         letter-spacing: -0.3px;
-    }
-    .header-spacer {
-        width: 40px;
     }
 
     /* Stats Row */
