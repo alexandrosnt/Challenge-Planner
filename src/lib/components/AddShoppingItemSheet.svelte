@@ -40,22 +40,27 @@
 		scanError = '';
 		scanning = true;
 		try {
-			const { scan, Format, checkPermissions, requestPermissions } =
+			const { scan, Format, checkPermissions, requestPermissions, openAppSettings } =
 				await import('@tauri-apps/plugin-barcode-scanner');
 
 			let perms = await checkPermissions();
-			if (perms === 'prompt') {
+			if (perms !== 'granted') {
 				perms = await requestPermissions();
+			}
+			if (perms === 'denied') {
+				scanning = false;
+				await openAppSettings();
+				return;
 			}
 			if (perms !== 'granted') {
 				scanning = false;
 				return;
 			}
 
-			const result = await scan({
-				formats: [Format.EAN13, Format.EAN8, Format.UPC_A, Format.UPC_E, Format.Code128],
-			});
 			scanning = false;
+			const result = await scan({
+				formats: [Format.EAN13, Format.EAN8, Format.UPC_E, Format.Code128],
+			});
 
 			if (!result?.content) return;
 
@@ -63,13 +68,16 @@
 			const product = await lookupBarcode(result.content);
 			name = product.name;
 			lookingUp = false;
-		} catch {
+		} catch (err) {
 			scanning = false;
 			lookingUp = false;
+			const msg = err instanceof Error ? err.message : String(err);
 			if (!isMobile) {
 				scanError = t.addModal.scanMobileOnly;
-				clearScanError();
+			} else if (msg) {
+				scanError = msg;
 			}
+			clearScanError();
 		}
 	}
 
