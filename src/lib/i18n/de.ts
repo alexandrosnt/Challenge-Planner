@@ -13,6 +13,8 @@ const de = {
 		notes: 'Notizen',
 		items: 'Artikel',
 		total: 'gesamt',
+		showMore: 'Mehr anzeigen',
+		remaining: 'übrig',
 		done: 'erledigt',
 		viewAll: 'Alle anzeigen',
 		seeAll: 'Alle ansehen',

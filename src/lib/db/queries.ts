@@ -602,6 +602,7 @@ export async function updateItem(
 		category_id: number;
 		subcategory_id: number | null;
 		purchase_price: number | null;
+		quantity: number;
 		notes: string | null;
 	}>
 ): Promise<void> {

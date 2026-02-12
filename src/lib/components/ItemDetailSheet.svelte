@@ -29,6 +29,7 @@
 	let editCategoryId = $state(0);
 	let editSubcategoryId = $state(0);
 	let editPrice = $state('');
+	let editQuantity = $state(1);
 	let editNotes = $state('');
 	/** @type {Category[]} */
 	let categories = $state([]);
@@ -148,6 +149,7 @@
 		editCategoryId = displayItem.category_id;
 		editSubcategoryId = displayItem.subcategory_id ?? 0;
 		editPrice = displayItem.purchase_price != null ? String(displayItem.purchase_price) : '';
+		editQuantity = displayItem.quantity ?? 1;
 		editNotes = displayItem.notes ?? '';
 		categories = await getCategories();
 		if (displayItem.category_id) {
@@ -173,6 +175,7 @@
 				category_id: editCategoryId,
 				subcategory_id: editSubcategoryId > 0 ? editSubcategoryId : null,
 				purchase_price: editPrice ? Number(editPrice) : null,
+				quantity: editQuantity > 0 ? editQuantity : 1,
 				notes: editNotes || null
 			});
 			triggerRefresh();
@@ -297,6 +300,17 @@
 								min="0"
 								bind:value={editPrice}
 								placeholder="0.00"
+							/>
+						</div>
+
+						<div class="form-group">
+							<label for="edit-quantity">{t.addModal.quantity}</label>
+							<input
+								id="edit-quantity"
+								type="number"
+								min="1"
+								step="1"
+								bind:value={editQuantity}
 							/>
 						</div>
 

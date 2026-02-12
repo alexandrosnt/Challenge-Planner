@@ -13,6 +13,8 @@ const en = {
 		notes: 'Notes',
 		items: 'items',
 		total: 'total',
+		showMore: 'Show more',
+		remaining: 'remaining',
 		done: 'done',
 		viewAll: 'View All',
 		seeAll: 'See All',

@@ -24,6 +24,8 @@
     let refresh = getRefreshSignal();
     let selectedStatus = $state('all');
     let searchQuery = $state('');
+    let pageSize = 20;
+    let visibleCount = $state(20);
     /** @type {import('$lib/db/queries').Item | null} */
     let selectedItem = $state(null);
 
@@ -100,6 +102,22 @@
             result = result.filter(i => i.status === selectedStatus);
         }
         return result;
+    });
+
+    let paginatedItems = $derived(filteredItems.slice(0, visibleCount));
+    let hasMore = $derived(filteredItems.length > visibleCount);
+
+    function showMore() {
+        visibleCount += pageSize;
+    }
+
+    // Reset pagination when filters change
+    $effect(() => {
+        searchQuery;
+        selectedCategoryId;
+        selectedSubcategoryId;
+        selectedStatus;
+        visibleCount = pageSize;
     });
 
     let statusCounts = $derived.by(() => {
@@ -236,7 +254,7 @@
         </div>
     {:else}
         <div class="items-list">
-            {#each filteredItems as item (item.id)}
+            {#each paginatedItems as item (item.id)}
                 {#if selectMode}
                     <!-- svelte-ignore a11y_click_events_have_key_events -->
                     <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -247,7 +265,7 @@
                                 <i class={item.category_icon ?? 'ri-box-3-line'}></i>
                             </div>
                             <div class="list-item-info">
-                                <h3 class="list-item-name">{item.name}</h3>
+                                <h3 class="list-item-name">{item.name}{#if item.quantity > 1} <span class="qty-badge">x{item.quantity}</span>{/if}</h3>
                                 <span class="list-item-sub">{item.subcategory_name || item.category_name}</span>
                             </div>
                             <div class="list-item-right">
@@ -275,7 +293,7 @@
                                 <i class={item.category_icon ?? 'ri-box-3-line'}></i>
                             </div>
                             <div class="list-item-info">
-                                <h3 class="list-item-name">{item.name}</h3>
+                                <h3 class="list-item-name">{item.name}{#if item.quantity > 1} <span class="qty-badge">x{item.quantity}</span>{/if}</h3>
                                 <span class="list-item-sub">{item.subcategory_name || item.category_name}</span>
                             </div>
                             <div class="list-item-right">
@@ -305,6 +323,11 @@
                 </div>
             {/each}
         </div>
+        {#if hasMore}
+            <button class="show-more-btn" onclick={showMore}>
+                {t.common.showMore} ({filteredItems.length - visibleCount} {t.common.remaining})
+            </button>
+        {/if}
     {/if}
 </main>
 
@@ -500,6 +523,15 @@
         margin: 0;
         white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
+    .qty-badge {
+        font-size: 11px;
+        font-weight: 700;
+        color: white;
+        background: var(--accent-pink);
+        padding: 1px 6px;
+        border-radius: 50px;
+        vertical-align: middle;
+    }
     .list-item-sub {
         font-size: 11px; color: var(--text-soft);
         text-transform: uppercase; letter-spacing: 0.3px;
@@ -551,5 +583,24 @@
     .inline-delete-btn:active {
         color: var(--accent-pink);
         transform: scale(0.85);
+    }
+    .show-more-btn {
+        width: 100%;
+        padding: 14px;
+        margin-top: 12px;
+        border: 1px dashed rgba(0, 0, 0, 0.12);
+        border-radius: var(--radius-s);
+        background: transparent;
+        font-family: 'Poppins', sans-serif;
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--accent-pink);
+        cursor: pointer;
+        transition: 0.2s;
+        -webkit-tap-highlight-color: transparent;
+    }
+    .show-more-btn:active {
+        transform: scale(0.97);
+        background: rgba(255, 107, 129, 0.04);
     }
 </style>
