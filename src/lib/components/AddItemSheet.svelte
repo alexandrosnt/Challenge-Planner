@@ -4,6 +4,7 @@
 	import { closeModal } from '$lib/stores/modal.svelte';
 	import { triggerRefresh } from '$lib/stores/refresh.svelte';
 	import { t } from '$lib/i18n/index.svelte';
+	import { lookupBarcode } from '$lib/api/openfoodfacts';
 	import {
 		getCategories,
 		getSubcategories,
@@ -19,6 +20,11 @@
 	let categories: Category[] = $state([]);
 	let subcategories: Subcategory[] = $state([]);
 	let submitting = $state(false);
+
+	// Barcode scanning state
+	let isMobile = $state(false);
+	let scanning = $state(false);
+	let lookingUp = $state(false);
 
 	// Form fields
 	let name = $state('');
@@ -49,7 +55,50 @@
 
 	onMount(async () => {
 		categories = await getCategories();
+		try {
+			const { platform } = await import('@tauri-apps/plugin-os');
+			const p = platform();
+			isMobile = p === 'android' || p === 'ios';
+		} catch {
+			isMobile = false;
+		}
 	});
+
+	async function handleScan() {
+		if (scanning || lookingUp) return;
+		scanning = true;
+		try {
+			const { scan, Format, checkPermissions, requestPermissions } =
+				await import('@tauri-apps/plugin-barcode-scanner');
+
+			let perms = await checkPermissions();
+			if (perms === 'prompt') {
+				perms = await requestPermissions();
+			}
+			if (perms !== 'granted') {
+				scanning = false;
+				return;
+			}
+
+			const result = await scan({
+				formats: [Format.EAN13, Format.EAN8, Format.UPC_A, Format.UPC_E, Format.Code128],
+			});
+			scanning = false;
+
+			if (!result?.content) return;
+
+			lookingUp = true;
+			const product = await lookupBarcode(result.content);
+			name = product.name;
+			if (product.categoryId) {
+				categoryId = product.categoryId;
+			}
+			lookingUp = false;
+		} catch {
+			scanning = false;
+			lookingUp = false;
+		}
+	}
 
 	function resetForm() {
 		name = '';
@@ -109,13 +158,33 @@
 			<form onsubmit={(e) => { e.preventDefault(); handleSubmit(); }}>
 				<div class="form-group">
 					<label for="item-name">{t.common.name}</label>
-					<input
-						id="item-name"
-						type="text"
-						bind:value={name}
-						placeholder={t.addModal.productName}
-						required
-					/>
+					<div class="name-row">
+						<input
+							id="item-name"
+							type="text"
+							bind:value={name}
+							placeholder={t.addModal.productName}
+							required
+						/>
+						{#if isMobile}
+							<button
+								type="button"
+								class="scan-btn"
+								onclick={handleScan}
+								disabled={scanning || lookingUp}
+								title={t.addModal.scanBarcode}
+							>
+								{#if scanning || lookingUp}
+									<i class="ri-loader-4-line spin"></i>
+								{:else}
+									<i class="ri-barcode-line"></i>
+								{/if}
+							</button>
+						{/if}
+					</div>
+					{#if lookingUp}
+						<span class="scan-status">{t.addModal.lookingUp}</span>
+					{/if}
 				</div>
 
 				<div class="form-group">
@@ -315,5 +384,57 @@
 	.submit-btn:disabled {
 		opacity: 0.6;
 		cursor: not-allowed;
+	}
+
+	.name-row {
+		display: flex;
+		gap: 8px;
+		align-items: stretch;
+	}
+
+	.name-row input {
+		flex: 1;
+		min-width: 0;
+	}
+
+	.scan-btn {
+		width: 48px;
+		flex-shrink: 0;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		border: 1px solid rgba(0, 0, 0, 0.06);
+		border-radius: var(--radius-s);
+		background: rgba(255, 255, 255, 0.8);
+		color: var(--accent-pink);
+		font-size: 22px;
+		cursor: pointer;
+		transition: background 0.2s ease, transform 0.2s ease;
+	}
+
+	.scan-btn:active {
+		transform: scale(0.93);
+	}
+
+	.scan-btn:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
+
+	.scan-status {
+		display: block;
+		font-size: 12px;
+		color: var(--text-soft);
+		margin-top: 4px;
+		font-family: 'Poppins', sans-serif;
+	}
+
+	.spin {
+		animation: spin 1s linear infinite;
+	}
+
+	@keyframes spin {
+		from { transform: rotate(0deg); }
+		to { transform: rotate(360deg); }
 	}
 </style>

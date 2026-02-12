@@ -216,6 +216,13 @@ jobs:
       - name: Init Tauri iOS
         run: npx tauri ios init
 
+      - name: Patch iOS plist for camera permission
+        run: |
+          PLIST=$(find src-tauri/gen/apple -name "Info.plist" -path "*_iOS*" | head -1)
+          if [ -n "$PLIST" ]; then
+            /usr/libexec/PlistBuddy -c "Add :NSCameraUsageDescription string 'Use Up needs camera access to scan product barcodes'" "$PLIST" 2>/dev/null || true
+          fi
+
       - name: Disable code signing in Xcode project
         run: |
           PBXPROJ="src-tauri/gen/apple/app.xcodeproj/project.pbxproj"
