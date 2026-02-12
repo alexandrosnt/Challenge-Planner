@@ -171,3 +171,74 @@ jobs:
             src-tauri/gen/android/app/build/outputs/apk/**/*.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  ios:
+    permissions:
+      contents: write
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Init Tauri iOS
+        run: npx tauri ios init
+
+      - name: Disable code signing in Xcode project
+        run: |
+          PBXPROJ="src-tauri/gen/apple/app.xcodeproj/project.pbxproj"
+          # Clear any signing identity
+          sed -i '' 's/CODE_SIGN_IDENTITY = ".*"/CODE_SIGN_IDENTITY = ""/g' "$PBXPROJ"
+          sed -i '' 's/"CODE_SIGN_IDENTITY\[sdk=iphoneos\*\]" = ".*"/"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = ""/g' "$PBXPROJ"
+          # Remove development team
+          sed -i '' '/DEVELOPMENT_TEAM/d' "$PBXPROJ"
+          # Inject CODE_SIGNING_ALLOWED = NO into every buildSettings block
+          awk '/buildSettings = \{/ { print; print "\t\t\t\tCODE_SIGNING_ALLOWED = NO;"; print "\t\t\t\tCODE_SIGNING_REQUIRED = NO;"; next }1' "$PBXPROJ" > "$PBXPROJ.tmp" && mv "$PBXPROJ.tmp" "$PBXPROJ"
+
+      - name: Build iOS (unsigned)
+        continue-on-error: true
+        run: npx tauri ios build
+
+      - name: Package unsigned IPA
+        run: |
+          # Find the xcarchive (tauri puts it under src-tauri/gen/apple/build/)
+          ARCHIVE=$(find src-tauri/gen/apple/build -name "*.xcarchive" -type d 2>/dev/null | head -1)
+          if [ -z "$ARCHIVE" ]; then
+            echo "Searching DerivedData for archive..."
+            ARCHIVE=$(find ~/Library/Developer/Xcode/DerivedData -name "*.xcarchive" -type d 2>/dev/null | head -1)
+          fi
+          if [ -z "$ARCHIVE" ]; then
+            echo "ERROR: No xcarchive found"
+            find src-tauri/gen/apple/build -type d -maxdepth 4 2>/dev/null || true
+            exit 1
+          fi
+          echo "Found archive: $ARCHIVE"
+          ls -la "$ARCHIVE/Products/Applications/" || true
+          mkdir -p Payload
+          cp -r "$ARCHIVE/Products/Applications/"*.app Payload/
+          zip -r UseUp-unsigned.ipa Payload
+
+      - name: Upload IPA to release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: UseUp-unsigned.ipa
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
