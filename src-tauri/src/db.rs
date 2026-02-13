@@ -121,7 +121,7 @@ async fn try_remote_replica(path: &str, url: &str, token: &str) -> Result<Databa
     let connector = HttpsConnectorBuilder::new()
         .with_webpki_roots()
         .https_or_http()
-        .enable_http1()
+        .enable_all_versions()
         .build();
 
     Builder::new_remote_replica(path, url.to_string(), token.to_string())
