@@ -18,6 +18,7 @@
 	let {
 		item,
 		onMarkEmptied,
+		onUndoEmptied,
 		onRemove,
 		onEdit,
 		selectMode = false,
@@ -26,6 +27,7 @@
 	}: {
 		item: PanItem;
 		onMarkEmptied?: (id: number) => void;
+		onUndoEmptied?: (id: number) => void;
 		onRemove?: (id: number) => void;
 		onEdit?: (id: number) => void;
 		selectMode?: boolean;
@@ -84,21 +86,31 @@
 		<ProgressBar value={percentage} height="8px" />
 	</div>
 
-	{#if onMarkEmptied}
-		<button
-			class="mark-emptied-btn"
-			class:complete={isComplete}
-			disabled={isComplete}
-			onclick={() => onMarkEmptied(item.id)}
-		>
-			{#if isComplete}
-				<i class="ri-check-double-line"></i>
-			{:else}
-				<i class="ri-check-line"></i>
-			{/if}
-			{t.panProject.markEmptied}
-		</button>
-	{/if}
+	<div class="btn-row">
+		{#if onUndoEmptied && item.emptied > 0}
+			<button
+				class="undo-emptied-btn"
+				onclick={() => onUndoEmptied(item.id)}
+			>
+				<i class="ri-arrow-go-back-line"></i>
+				{t.panProject.undoEmptied}
+			</button>
+		{/if}
+		{#if onMarkEmptied}
+			<button
+				class="mark-emptied-btn"
+				class:complete={isComplete}
+				onclick={() => onMarkEmptied(item.id)}
+			>
+				{#if isComplete}
+					<i class="ri-check-double-line"></i>
+				{:else}
+					<i class="ri-check-line"></i>
+				{/if}
+				{t.panProject.markEmptied}
+			</button>
+		{/if}
+	</div>
 </div>
 
 <style>
@@ -212,8 +224,38 @@
 		color: var(--text-soft);
 	}
 
+	.btn-row {
+		display: flex;
+		gap: 8px;
+	}
+
+	.undo-emptied-btn {
+		flex: 0 0 auto;
+		padding: 10px 14px;
+		border: 1px solid rgba(0, 0, 0, 0.06);
+		border-radius: 50px;
+		background: white;
+		font-family: 'Poppins', sans-serif;
+		font-size: 13px;
+		font-weight: 600;
+		color: var(--text-soft);
+		cursor: pointer;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 6px;
+		transition: 0.2s;
+		-webkit-tap-highlight-color: transparent;
+		touch-action: manipulation;
+	}
+
+	.undo-emptied-btn:active {
+		transform: scale(0.98);
+		background: #f5f5f5;
+	}
+
 	.mark-emptied-btn {
-		width: 100%;
+		flex: 1;
 		padding: 10px;
 		border: 1px solid rgba(0, 0, 0, 0.06);
 		border-radius: 50px;

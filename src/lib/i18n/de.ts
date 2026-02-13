@@ -336,6 +336,7 @@ const de = {
 		editQuantity: 'Menge bearbeiten',
 		save: 'Speichern',
 		saving: 'Speichern...',
+		undoEmptied: 'Rückgängig',
 	},
 	shoppingList: {
 		title: 'Einkaufsliste',

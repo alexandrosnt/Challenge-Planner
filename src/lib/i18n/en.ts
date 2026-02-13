@@ -336,6 +336,7 @@ const en = {
 		editQuantity: 'Edit Quantity',
 		save: 'Save',
 		saving: 'Saving...',
+		undoEmptied: 'Undo',
 	},
 	shoppingList: {
 		title: 'Shopping List',

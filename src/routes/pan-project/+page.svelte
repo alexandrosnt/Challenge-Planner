@@ -5,7 +5,7 @@
     import PanItemCard from '$lib/components/PanItemCard.svelte';
     import SelectModeButton from '$lib/components/SelectModeButton.svelte';
     import SelectionBar from '$lib/components/SelectionBar.svelte';
-    import { getPanItems, getPanProjectStats, markPanItemEmptied, removePanItem, removePanItems, updatePanItem, type PanProjectItem, type PanProjectStats } from '$lib/db/queries';
+    import { getPanItems, getPanProjectStats, markPanItemEmptied, undoPanItemEmptied, removePanItem, removePanItems, updatePanItem, type PanProjectItem, type PanProjectStats } from '$lib/db/queries';
     import { getAuthState } from '$lib/stores/auth.svelte';
     import { getRefreshSignal, triggerRefresh } from '$lib/stores/refresh.svelte';
     import { t } from '$lib/i18n/index.svelte';
@@ -92,6 +92,12 @@
 
     async function handleMarkEmptied(panItemId: number) {
         await markPanItemEmptied(panItemId);
+        triggerRefresh();
+        await loadData();
+    }
+
+    async function handleUndoEmptied(panItemId: number) {
+        await undoPanItemEmptied(panItemId);
         triggerRefresh();
         await loadData();
     }
@@ -194,6 +200,7 @@
                 <PanItemCard
                     {item}
                     onMarkEmptied={selectMode ? undefined : handleMarkEmptied}
+                    onUndoEmptied={selectMode ? undefined : handleUndoEmptied}
                     onRemove={selectMode ? undefined : handleRemove}
                     onEdit={selectMode ? undefined : startEdit}
                     {selectMode}

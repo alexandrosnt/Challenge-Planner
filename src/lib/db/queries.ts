@@ -1951,6 +1951,22 @@ export async function markPanItemEmptied(panItemId: number): Promise<void> {
 	});
 }
 
+export async function undoPanItemEmptied(panItemId: number): Promise<void> {
+	const db = getDb();
+	// Decrement emptied count (min 0)
+	await db.execute({
+		sql: 'UPDATE pan_project_items SET emptied = MAX(emptied - 1, 0) WHERE id = ?',
+		args: [panItemId]
+	});
+	// If the inventory item was auto-marked used_up, reactivate it
+	await db.execute({
+		sql: `UPDATE items SET status = 'active', used_up_at = NULL
+			WHERE id = (SELECT item_id FROM pan_project_items WHERE id = ? AND emptied < quantity)
+			AND status = 'used_up'`,
+		args: [panItemId]
+	});
+}
+
 export async function removePanItem(userId: number, panItemId: number): Promise<void> {
 	const db = getDb();
 	await db.execute({
