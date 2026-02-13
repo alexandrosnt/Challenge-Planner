@@ -20,6 +20,7 @@
     let editingId: number | null = $state(null);
     let editQuantity = $state(1);
     let saving = $state(false);
+    let searchQuery = $state('');
 
     // Select mode
     let selectMode = $state(false);
@@ -38,7 +39,7 @@
     }
 
     function selectAll() {
-        selectedIds = new Set(items.map(i => i.id));
+        selectedIds = new Set(filteredItems.map(i => i.id));
     }
 
     function deselectAll() {
@@ -60,6 +61,15 @@
             deletingSelected = false;
         }
     }
+
+    let filteredItems = $derived.by(() => {
+        if (!searchQuery.trim()) return items;
+        const q = searchQuery.trim().toLowerCase();
+        return items.filter(i =>
+            i.item_name.toLowerCase().includes(q) ||
+            i.category_name.toLowerCase().includes(q)
+        );
+    });
 
     let completionPct = $derived(
         stats && stats.total > 0 ? Math.round((stats.emptied / stats.total) * 100) : 0
@@ -162,8 +172,23 @@
 
         <!-- Pan Items -->
         {#if items.length > 0}
-            <SectionTitle title={t.panProject.progress} actionText="{items.length} {t.common.items}" />
-            {#each items as item (item.id)}
+            <div class="search-bar">
+                <i class="ri-search-line search-icon"></i>
+                <input
+                    class="search-input"
+                    type="text"
+                    placeholder={t.inventory.searchPlaceholder}
+                    bind:value={searchQuery}
+                />
+                {#if searchQuery}
+                    <button class="search-clear" onclick={() => searchQuery = ''}>
+                        <i class="ri-close-line"></i>
+                    </button>
+                {/if}
+            </div>
+
+            <SectionTitle title={t.panProject.progress} actionText="{filteredItems.length} {t.common.items}" />
+            {#each filteredItems as item (item.id)}
                 <PanItemCard
                     {item}
                     onMarkEmptied={selectMode ? undefined : handleMarkEmptied}
@@ -211,7 +236,7 @@
 
 <SelectionBar
     selectedCount={selectedIds.size}
-    totalCount={items.length}
+    totalCount={filteredItems.length}
     onSelectAll={selectAll}
     onDeselectAll={deselectAll}
     onDeleteSelected={handleDeleteSelected}
@@ -230,6 +255,51 @@
         font-weight: 700;
         color: var(--text-dark);
         letter-spacing: -0.3px;
+    }
+    .search-bar {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 14px;
+        background: white;
+        border: 1px solid rgba(0, 0, 0, 0.06);
+        border-radius: 50px;
+        margin-bottom: 14px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    }
+    .search-icon {
+        font-size: 18px;
+        color: var(--text-soft);
+        flex-shrink: 0;
+    }
+    .search-input {
+        flex: 1;
+        border: none;
+        outline: none;
+        background: transparent;
+        font-family: 'Poppins', sans-serif;
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--text-dark);
+    }
+    .search-input::placeholder {
+        color: var(--text-soft);
+        font-weight: 400;
+    }
+    .search-clear {
+        flex-shrink: 0;
+        background: none;
+        border: none;
+        padding: 2px;
+        cursor: pointer;
+        color: var(--text-soft);
+        font-size: 18px;
+        display: flex;
+        align-items: center;
+        -webkit-tap-highlight-color: transparent;
+    }
+    .search-clear:active {
+        color: var(--accent-pink);
     }
     .hero-ring {
         display: flex;

@@ -5,7 +5,7 @@
     import ProgressBar from '$lib/components/ProgressBar.svelte';
     import SelectModeButton from '$lib/components/SelectModeButton.svelte';
     import SelectionBar from '$lib/components/SelectionBar.svelte';
-    import { getBudgetWithSpending, getPurchases, getTotalSpentThisMonth, getCategories, updateBudget, deleteBudget, deleteBudgets, updatePurchase, deletePurchase, deletePurchases, type Budget, type Purchase, type Category } from '$lib/db/queries';
+    import { getBudgetWithSpending, getPurchases, getCategories, updateBudget, deleteBudget, deleteBudgets, updatePurchase, deletePurchase, deletePurchases, type Budget, type Purchase, type Category } from '$lib/db/queries';
     import { getAuthState } from '$lib/stores/auth.svelte';
     import { openModal } from '$lib/stores/modal.svelte';
     import { t } from '$lib/i18n/index.svelte';
@@ -120,18 +120,35 @@
     let budgetPct = $derived(totalLimit > 0 ? Math.round((totalSpent / totalLimit) * 100) : 0);
     let remaining = $derived(Math.max(0, totalLimit - totalSpent));
 
+    function formatMonth(ym: string): string {
+        const [y, m] = ym.split('-').map(Number);
+        const d = new Date(y, m - 1);
+        return d.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+    }
+
+    function prevMonth() {
+        const [y, m] = currentMonth.split('-').map(Number);
+        const d = new Date(y, m - 2);
+        currentMonth = d.toISOString().slice(0, 7);
+    }
+
+    function nextMonth() {
+        const [y, m] = currentMonth.split('-').map(Number);
+        const d = new Date(y, m);
+        currentMonth = d.toISOString().slice(0, 7);
+    }
+
     async function loadData() {
         const userId = auth.currentUser?.id;
         if (!userId) return;
         try {
-            const [b, p, spent] = await Promise.all([
+            const [b, p] = await Promise.all([
                 getBudgetWithSpending(userId, currentMonth),
                 getPurchases(userId, undefined, currentMonth),
-                getTotalSpentThisMonth(userId),
             ]);
             budgets = b;
             purchases = p;
-            totalSpent = spent;
+            totalSpent = p.reduce((sum, p) => sum + p.amount, 0);
         } catch (e) {
             console.error('Failed to load budget data:', e);
         } finally {
@@ -277,6 +294,7 @@
 
     $effect(() => {
         refresh.value;
+        currentMonth;
         loadData();
     });
 </script>
@@ -295,6 +313,17 @@
 </header>
 
 <main>
+    <!-- Month Navigator -->
+    <div class="month-nav">
+        <button class="month-btn" onclick={prevMonth} aria-label="Previous month">
+            <i class="ri-arrow-left-s-line"></i>
+        </button>
+        <span class="month-label">{formatMonth(currentMonth)}</span>
+        <button class="month-btn" onclick={nextMonth} aria-label="Next month">
+            <i class="ri-arrow-right-s-line"></i>
+        </button>
+    </div>
+
     {#if loading}
         <!-- Skeleton -->
         <GlassCard>
@@ -562,6 +591,38 @@
     .add-budget-btn:active {
         transform: scale(0.95);
         background: #f5f5f5;
+    }
+    .month-nav {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 8px 4px;
+        margin-bottom: 16px;
+    }
+    .month-btn {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        border: 1px solid rgba(0, 0, 0, 0.06);
+        background: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        font-size: 20px;
+        color: var(--text-soft);
+        transition: 0.2s;
+        -webkit-tap-highlight-color: transparent;
+    }
+    .month-btn:active {
+        transform: scale(0.9);
+        background: #f5f5f5;
+    }
+    .month-label {
+        font-size: 16px;
+        font-weight: 700;
+        color: var(--text-dark);
+        text-transform: capitalize;
     }
     .overview-card {
         display: flex;
