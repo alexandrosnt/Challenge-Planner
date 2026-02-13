@@ -617,6 +617,8 @@ export async function updateItem(
 		quantity: number;
 		notes: string | null;
 		rating: number;
+		status: string;
+		used_up_at: string | null;
 	}>
 ): Promise<void> {
 	const db = getDb();

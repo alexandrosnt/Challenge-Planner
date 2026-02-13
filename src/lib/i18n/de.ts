@@ -216,6 +216,7 @@ const de = {
 		amountRecovered: 'Zurückgewonnener Betrag',
 		processing: 'Verarbeitung...',
 		markFinished: 'Als aufgebraucht markieren',
+		reactivate: 'Artikel reaktivieren',
 		declutterItem: 'Artikel aussortieren',
 		edit: 'Bearbeiten',
 		save: 'Speichern',

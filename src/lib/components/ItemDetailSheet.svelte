@@ -103,6 +103,20 @@
 		}
 	}
 
+	async function handleReactivate() {
+		if (!displayItem) return;
+		const userId = auth.currentUser?.id;
+		if (!userId) return;
+		loading = true;
+		try {
+			await updateItem(userId, displayItem.id, { status: 'active', used_up_at: null });
+			triggerRefresh();
+			await loadData(displayItem.id);
+		} finally {
+			loading = false;
+		}
+	}
+
 	async function handleDeclutter() {
 		if (!currentItem) return;
 		const userId = auth.currentUser?.id;
@@ -393,6 +407,11 @@
 						<button class="finished-btn" onclick={handleMarkFinished} disabled={loading}>
 							<i class="ri-checkbox-circle-line"></i>
 							{t.itemDetail.markFinished}
+						</button>
+					{:else}
+						<button class="reactivate-btn" onclick={handleReactivate} disabled={loading}>
+							<i class="ri-refresh-line"></i>
+							{t.itemDetail.reactivate}
 						</button>
 					{/if}
 
@@ -700,6 +719,36 @@
 	}
 
 	.finished-btn:disabled {
+		opacity: 0.6;
+		cursor: not-allowed;
+	}
+
+	.reactivate-btn {
+		width: calc(100% - 40px);
+		margin: 20px 20px 0;
+		padding: 14px;
+		background: white;
+		border: 1px solid rgba(0, 0, 0, 0.08);
+		border-radius: 50px;
+		color: var(--accent-primary, #6366f1);
+		font-family: 'Poppins', sans-serif;
+		font-size: 15px;
+		font-weight: 600;
+		cursor: pointer;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 8px;
+		transition: transform 0.2s ease, background 0.2s ease;
+		-webkit-tap-highlight-color: transparent;
+	}
+
+	.reactivate-btn:active {
+		transform: scale(0.97);
+		background: #f0f0ff;
+	}
+
+	.reactivate-btn:disabled {
 		opacity: 0.6;
 		cursor: not-allowed;
 	}

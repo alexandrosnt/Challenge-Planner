@@ -216,6 +216,7 @@ const en = {
 		amountRecovered: 'Amount Recovered',
 		processing: 'Processing...',
 		markFinished: 'Mark as Finished',
+		reactivate: 'Reactivate Item',
 		declutterItem: 'Declutter Item',
 		edit: 'Edit',
 		save: 'Save',
