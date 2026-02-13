@@ -118,6 +118,10 @@ export async function initializeDatabase(): Promise<void> {
 	try { await db.execute("ALTER TABLE items ADD COLUMN rating INTEGER DEFAULT 0"); } catch { /* exists */ }
 	try { await db.execute("ALTER TABLE shopping_list ADD COLUMN rating INTEGER DEFAULT 0"); } catch { /* exists */ }
 
+	// Fix any NULL quantities (safe idempotent UPDATE)
+	try { await db.execute("UPDATE items SET quantity = 1 WHERE quantity IS NULL"); } catch { /* ignore */ }
+	try { await db.execute("UPDATE shopping_list SET quantity = 1 WHERE quantity IS NULL"); } catch { /* ignore */ }
+
 	// v6: Add name column to budgets (safe ALTER TABLE — no DROP)
 	if (currentVersion < 6) {
 		// Recovery: if a previous broken migration left budgets_v6 but dropped budgets
@@ -1312,7 +1316,7 @@ export async function checkAchievements(userId: number): Promise<string[]> {
 	const currentMonth = new Date().toISOString().slice(0, 7);
 
 	const results = await db.batch([
-		{ sql: "SELECT COALESCE(SUM(quantity), 0) as cnt FROM items WHERE status = 'used_up' AND user_id = ?", args: [userId] },
+		{ sql: "SELECT COALESCE(SUM(COALESCE(quantity,1)), 0) as cnt FROM items WHERE status = 'used_up' AND user_id = ?", args: [userId] },
 		{ sql: 'SELECT MAX(best_count) as best FROM streaks WHERE user_id = ?', args: [userId] },
 		{ sql: 'SELECT COUNT(*) as cnt FROM challenges WHERE completed >= total AND user_id = ?', args: [userId] },
 		{ sql: 'SELECT COUNT(*) as cnt FROM usage_log WHERE user_id = ?', args: [userId] },
@@ -1365,10 +1369,10 @@ export async function getComputedStats(userId: number): Promise<ComputedStats> {
 
 	const [itemCounts, spentResult, budgetResult, usageResult, streakResult] = await db.batch([
 		{ sql: `SELECT
-			COALESCE(SUM(quantity), 0) as total,
-			COALESCE(SUM(CASE WHEN status = 'active' THEN quantity ELSE 0 END), 0) as active,
-			COALESCE(SUM(CASE WHEN status = 'used_up' THEN quantity ELSE 0 END), 0) as used_up,
-			COALESCE(SUM(CASE WHEN status = 'decluttered' THEN quantity ELSE 0 END), 0) as decluttered
+			COALESCE(SUM(COALESCE(quantity,1)), 0) as total,
+			COALESCE(SUM(CASE WHEN status = 'active' THEN COALESCE(quantity,1) ELSE 0 END), 0) as active,
+			COALESCE(SUM(CASE WHEN status = 'used_up' THEN COALESCE(quantity,1) ELSE 0 END), 0) as used_up,
+			COALESCE(SUM(CASE WHEN status = 'decluttered' THEN COALESCE(quantity,1) ELSE 0 END), 0) as decluttered
 			FROM items WHERE user_id = ?`, args: [userId] },
 		{
 			sql: `SELECT COALESCE(SUM(amount), 0) as total FROM purchases
@@ -1608,16 +1612,16 @@ export async function loadProgressData(userId: number): Promise<ProgressData> {
 	const currentMonth = new Date().toISOString().slice(0, 7);
 
 	const results = await db.batch([
-		{ sql: `SELECT COALESCE(SUM(quantity), 0) as total,
-			COALESCE(SUM(CASE WHEN status = 'active' THEN quantity ELSE 0 END), 0) as active,
-			COALESCE(SUM(CASE WHEN status = 'used_up' THEN quantity ELSE 0 END), 0) as used_up,
-			COALESCE(SUM(CASE WHEN status = 'decluttered' THEN quantity ELSE 0 END), 0) as decluttered
+		{ sql: `SELECT COALESCE(SUM(COALESCE(quantity,1)), 0) as total,
+			COALESCE(SUM(CASE WHEN status = 'active' THEN COALESCE(quantity,1) ELSE 0 END), 0) as active,
+			COALESCE(SUM(CASE WHEN status = 'used_up' THEN COALESCE(quantity,1) ELSE 0 END), 0) as used_up,
+			COALESCE(SUM(CASE WHEN status = 'decluttered' THEN COALESCE(quantity,1) ELSE 0 END), 0) as decluttered
 			FROM items WHERE user_id = ?`, args: [userId] },
 		{ sql: `SELECT c.id as category_id, c.name as category_name, c.icon as category_icon,
-			COALESCE(SUM(i.quantity), 0) as total,
-			COALESCE(SUM(CASE WHEN i.status = 'used_up' THEN i.quantity ELSE 0 END), 0) as used_up,
-			COALESCE(SUM(CASE WHEN i.status = 'active' THEN i.quantity ELSE 0 END), 0) as active,
-			COALESCE(SUM(CASE WHEN i.status = 'decluttered' THEN i.quantity ELSE 0 END), 0) as decluttered
+			COALESCE(SUM(COALESCE(i.quantity,1)), 0) as total,
+			COALESCE(SUM(CASE WHEN i.status = 'used_up' THEN COALESCE(i.quantity,1) ELSE 0 END), 0) as used_up,
+			COALESCE(SUM(CASE WHEN i.status = 'active' THEN COALESCE(i.quantity,1) ELSE 0 END), 0) as active,
+			COALESCE(SUM(CASE WHEN i.status = 'decluttered' THEN COALESCE(i.quantity,1) ELSE 0 END), 0) as decluttered
 			FROM categories c LEFT JOIN items i ON i.category_id = c.id AND i.user_id = ?
 			GROUP BY c.id ORDER BY c.id`, args: [userId] },
 		{ sql: 'SELECT COUNT(*) as cnt FROM usage_log WHERE user_id = ?', args: [userId] },
@@ -1714,11 +1718,11 @@ export async function loadHomeData(userId: number): Promise<HomeData> {
 			COALESCE(b.name, c.name, 'Budget') as display_name
 			FROM budgets b LEFT JOIN categories c ON b.category_id = c.id
 			WHERE b.month = ? AND b.user_id = ? ORDER BY b.id`, args: [currentMonth, userId] },
-		// 4: stats - item counts (quantity-aware)
-		{ sql: `SELECT COALESCE(SUM(quantity), 0) as total,
-			COALESCE(SUM(CASE WHEN status = 'active' THEN quantity ELSE 0 END), 0) as active,
-			COALESCE(SUM(CASE WHEN status = 'used_up' THEN quantity ELSE 0 END), 0) as used_up,
-			COALESCE(SUM(CASE WHEN status = 'decluttered' THEN quantity ELSE 0 END), 0) as decluttered
+		// 4: stats - item counts (quantity-aware, COALESCE(quantity,1) for NULL safety)
+		{ sql: `SELECT COALESCE(SUM(COALESCE(quantity,1)), 0) as total,
+			COALESCE(SUM(CASE WHEN status = 'active' THEN COALESCE(quantity,1) ELSE 0 END), 0) as active,
+			COALESCE(SUM(CASE WHEN status = 'used_up' THEN COALESCE(quantity,1) ELSE 0 END), 0) as used_up,
+			COALESCE(SUM(CASE WHEN status = 'decluttered' THEN COALESCE(quantity,1) ELSE 0 END), 0) as decluttered
 			FROM items WHERE user_id = ?`, args: [userId] },
 		// 5: stats - monthly spend
 		{ sql: `SELECT COALESCE(SUM(amount), 0) as total FROM purchases
@@ -1932,8 +1936,16 @@ export async function getPanItems(userId: number): Promise<PanProjectItem[]> {
 
 export async function markPanItemEmptied(panItemId: number): Promise<void> {
 	const db = getDb();
+	// Increment emptied count
 	await db.execute({
 		sql: 'UPDATE pan_project_items SET emptied = MIN(emptied + 1, quantity) WHERE id = ?',
+		args: [panItemId]
+	});
+	// If fully emptied, also mark the inventory item as used_up
+	await db.execute({
+		sql: `UPDATE items SET status = 'used_up', used_up_at = datetime('now')
+			WHERE id = (SELECT item_id FROM pan_project_items WHERE id = ? AND emptied >= quantity)
+			AND status = 'active'`,
 		args: [panItemId]
 	});
 }

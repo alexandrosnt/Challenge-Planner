@@ -128,15 +128,15 @@
 		position: absolute;
 		top: 12px;
 		right: 12px;
-		z-index: 2;
+		z-index: 5;
 	}
 
 	.edit-btn {
 		position: absolute;
-		top: 12px;
-		right: 44px;
-		width: 28px;
-		height: 28px;
+		top: 10px;
+		right: 48px;
+		width: 36px;
+		height: 36px;
 		border: none;
 		border-radius: 50%;
 		background: rgba(0, 0, 0, 0.05);
@@ -148,6 +148,8 @@
 		cursor: pointer;
 		transition: 0.2s;
 		padding: 0;
+		z-index: 5;
+		-webkit-tap-highlight-color: transparent;
 	}
 
 	.edit-btn:active {
@@ -158,10 +160,10 @@
 
 	.remove-btn {
 		position: absolute;
-		top: 12px;
-		right: 12px;
-		width: 28px;
-		height: 28px;
+		top: 10px;
+		right: 10px;
+		width: 36px;
+		height: 36px;
 		border: none;
 		border-radius: 50%;
 		background: rgba(0, 0, 0, 0.05);
@@ -173,6 +175,8 @@
 		cursor: pointer;
 		transition: 0.2s;
 		padding: 0;
+		z-index: 5;
+		-webkit-tap-highlight-color: transparent;
 	}
 
 	.remove-btn:active {
@@ -186,7 +190,7 @@
 		align-items: center;
 		gap: 14px;
 		margin-bottom: 16px;
-		padding-right: 28px;
+		padding-right: 80px;
 	}
 
 	.icon-box {

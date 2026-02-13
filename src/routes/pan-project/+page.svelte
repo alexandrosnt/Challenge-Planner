@@ -92,6 +92,7 @@
 
     async function handleMarkEmptied(panItemId: number) {
         await markPanItemEmptied(panItemId);
+        triggerRefresh();
         await loadData();
     }
 
@@ -99,6 +100,7 @@
         const userId = auth.currentUser?.id;
         if (!userId) return;
         await removePanItem(userId, panItemId);
+        triggerRefresh();
         await loadData();
     }
 
