@@ -70,7 +70,7 @@
         /** @type {Record<number, number>} */
         const counts = {};
         for (const item of items) {
-            counts[item.category_id] = (counts[item.category_id] || 0) + (item.quantity ?? 1);
+            counts[item.category_id] = (counts[item.category_id] || 0) + 1;
         }
         return counts;
     });

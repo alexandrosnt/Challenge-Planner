@@ -1316,7 +1316,7 @@ export async function checkAchievements(userId: number): Promise<string[]> {
 	const currentMonth = new Date().toISOString().slice(0, 7);
 
 	const results = await db.batch([
-		{ sql: "SELECT COALESCE(SUM(COALESCE(quantity,1)), 0) as cnt FROM items WHERE status = 'used_up' AND user_id = ?", args: [userId] },
+		{ sql: "SELECT COUNT(*) as cnt FROM items WHERE status = 'used_up' AND user_id = ?", args: [userId] },
 		{ sql: 'SELECT MAX(best_count) as best FROM streaks WHERE user_id = ?', args: [userId] },
 		{ sql: 'SELECT COUNT(*) as cnt FROM challenges WHERE completed >= total AND user_id = ?', args: [userId] },
 		{ sql: 'SELECT COUNT(*) as cnt FROM usage_log WHERE user_id = ?', args: [userId] },
@@ -1368,11 +1368,10 @@ export async function getComputedStats(userId: number): Promise<ComputedStats> {
 	const currentMonth = new Date().toISOString().slice(0, 7);
 
 	const [itemCounts, spentResult, budgetResult, usageResult, streakResult] = await db.batch([
-		{ sql: `SELECT
-			COALESCE(SUM(COALESCE(quantity,1)), 0) as total,
-			COALESCE(SUM(CASE WHEN status = 'active' THEN COALESCE(quantity,1) ELSE 0 END), 0) as active,
-			COALESCE(SUM(CASE WHEN status = 'used_up' THEN COALESCE(quantity,1) ELSE 0 END), 0) as used_up,
-			COALESCE(SUM(CASE WHEN status = 'decluttered' THEN COALESCE(quantity,1) ELSE 0 END), 0) as decluttered
+		{ sql: `SELECT COUNT(*) as total,
+			SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active,
+			SUM(CASE WHEN status = 'used_up' THEN 1 ELSE 0 END) as used_up,
+			SUM(CASE WHEN status = 'decluttered' THEN 1 ELSE 0 END) as decluttered
 			FROM items WHERE user_id = ?`, args: [userId] },
 		{
 			sql: `SELECT COALESCE(SUM(amount), 0) as total FROM purchases
@@ -1612,16 +1611,16 @@ export async function loadProgressData(userId: number): Promise<ProgressData> {
 	const currentMonth = new Date().toISOString().slice(0, 7);
 
 	const results = await db.batch([
-		{ sql: `SELECT COALESCE(SUM(COALESCE(quantity,1)), 0) as total,
-			COALESCE(SUM(CASE WHEN status = 'active' THEN COALESCE(quantity,1) ELSE 0 END), 0) as active,
-			COALESCE(SUM(CASE WHEN status = 'used_up' THEN COALESCE(quantity,1) ELSE 0 END), 0) as used_up,
-			COALESCE(SUM(CASE WHEN status = 'decluttered' THEN COALESCE(quantity,1) ELSE 0 END), 0) as decluttered
+		{ sql: `SELECT COUNT(*) as total,
+			SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active,
+			SUM(CASE WHEN status = 'used_up' THEN 1 ELSE 0 END) as used_up,
+			SUM(CASE WHEN status = 'decluttered' THEN 1 ELSE 0 END) as decluttered
 			FROM items WHERE user_id = ?`, args: [userId] },
 		{ sql: `SELECT c.id as category_id, c.name as category_name, c.icon as category_icon,
-			COALESCE(SUM(COALESCE(i.quantity,1)), 0) as total,
-			COALESCE(SUM(CASE WHEN i.status = 'used_up' THEN COALESCE(i.quantity,1) ELSE 0 END), 0) as used_up,
-			COALESCE(SUM(CASE WHEN i.status = 'active' THEN COALESCE(i.quantity,1) ELSE 0 END), 0) as active,
-			COALESCE(SUM(CASE WHEN i.status = 'decluttered' THEN COALESCE(i.quantity,1) ELSE 0 END), 0) as decluttered
+			COUNT(i.id) as total,
+			SUM(CASE WHEN i.status = 'used_up' THEN 1 ELSE 0 END) as used_up,
+			SUM(CASE WHEN i.status = 'active' THEN 1 ELSE 0 END) as active,
+			SUM(CASE WHEN i.status = 'decluttered' THEN 1 ELSE 0 END) as decluttered
 			FROM categories c LEFT JOIN items i ON i.category_id = c.id AND i.user_id = ?
 			GROUP BY c.id ORDER BY c.id`, args: [userId] },
 		{ sql: 'SELECT COUNT(*) as cnt FROM usage_log WHERE user_id = ?', args: [userId] },
@@ -1718,11 +1717,11 @@ export async function loadHomeData(userId: number): Promise<HomeData> {
 			COALESCE(b.name, c.name, 'Budget') as display_name
 			FROM budgets b LEFT JOIN categories c ON b.category_id = c.id
 			WHERE b.month = ? AND b.user_id = ? ORDER BY b.id`, args: [currentMonth, userId] },
-		// 4: stats - item counts (quantity-aware, COALESCE(quantity,1) for NULL safety)
-		{ sql: `SELECT COALESCE(SUM(COALESCE(quantity,1)), 0) as total,
-			COALESCE(SUM(CASE WHEN status = 'active' THEN COALESCE(quantity,1) ELSE 0 END), 0) as active,
-			COALESCE(SUM(CASE WHEN status = 'used_up' THEN COALESCE(quantity,1) ELSE 0 END), 0) as used_up,
-			COALESCE(SUM(CASE WHEN status = 'decluttered' THEN COALESCE(quantity,1) ELSE 0 END), 0) as decluttered
+		// 4: stats - item counts
+		{ sql: `SELECT COUNT(*) as total,
+			SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active,
+			SUM(CASE WHEN status = 'used_up' THEN 1 ELSE 0 END) as used_up,
+			SUM(CASE WHEN status = 'decluttered' THEN 1 ELSE 0 END) as decluttered
 			FROM items WHERE user_id = ?`, args: [userId] },
 		// 5: stats - monthly spend
 		{ sql: `SELECT COALESCE(SUM(amount), 0) as total FROM purchases
