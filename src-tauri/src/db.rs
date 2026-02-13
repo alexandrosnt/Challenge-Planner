@@ -1,3 +1,4 @@
+use hyper_rustls::HttpsConnectorBuilder;
 use libsql::{Builder, Database, Connection, Value};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -115,7 +116,16 @@ async fn try_remote_replica(path: &str, url: &str, token: &str) -> Result<Databa
     let metadata_path = format!("{}-metadata", path);
     let _ = std::fs::remove_file(&metadata_path);
 
+    // Use bundled Mozilla CA certs (webpki-roots) instead of rustls-native-certs
+    // because rustls-native-certs does NOT support iOS — it can't load system certs
+    let connector = HttpsConnectorBuilder::new()
+        .with_webpki_roots()
+        .https_or_http()
+        .enable_http1()
+        .build();
+
     Builder::new_remote_replica(path, url.to_string(), token.to_string())
+        .connector(connector)
         .read_your_writes(true)
         .build()
         .await
