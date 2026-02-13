@@ -2,7 +2,7 @@ import { getDb } from './client';
 import { CREATE_TABLES, SEED_DATA, SEED_SUBCATEGORIES, ACHIEVEMENT_DEFINITIONS, USER_ID_INDEXES } from './schema';
 import type { InStatement } from './client';
 
-const CURRENT_SCHEMA_VERSION = 6;
+const CURRENT_SCHEMA_VERSION = 7;
 
 // --- Helpers ---
 
@@ -113,6 +113,10 @@ export async function initializeDatabase(): Promise<void> {
 			await db.execute(`ALTER TABLE monthly_stats_v4 RENAME TO monthly_stats`);
 		} catch { /* already migrated or fresh install */ }
 	}
+
+	// v7: Add rating column to items and shopping_list
+	try { await db.execute("ALTER TABLE items ADD COLUMN rating INTEGER DEFAULT 0"); } catch { /* exists */ }
+	try { await db.execute("ALTER TABLE shopping_list ADD COLUMN rating INTEGER DEFAULT 0"); } catch { /* exists */ }
 
 	// v6: Add name column to budgets (safe ALTER TABLE — no DROP)
 	if (currentVersion < 6) {
@@ -232,6 +236,7 @@ export interface Item {
 	quantity: number;
 	notes: string | null;
 	used_up_at: string | null;
+	rating: number;
 	created_at: string;
 	category_name?: string;
 	category_icon?: string;
@@ -556,6 +561,7 @@ export async function getItems(
 			quantity: (row.quantity as number) ?? 1,
 			notes: (row.notes as string) ?? null,
 			used_up_at: (row.used_up_at as string) ?? null,
+			rating: (row.rating as number) ?? 0,
 			created_at: row.created_at as string,
 			category_name: row.category_name as string,
 			category_icon: row.category_icon as string,
@@ -574,12 +580,13 @@ export async function addItem(
 	purchasePrice?: number | null,
 	purchaseDate?: string | null,
 	quantity?: number,
-	notes?: string | null
+	notes?: string | null,
+	rating?: number
 ): Promise<number> {
 	const db = getDb();
 	const result = await db.execute({
-		sql: `INSERT INTO items (name, category_id, subcategory_id, purchase_price, purchase_date, quantity, notes, user_id)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		sql: `INSERT INTO items (name, category_id, subcategory_id, purchase_price, purchase_date, quantity, notes, rating, user_id)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		args: [
 			name,
 			categoryId,
@@ -588,6 +595,7 @@ export async function addItem(
 			purchaseDate ?? null,
 			quantity ?? 1,
 			notes ?? null,
+			rating ?? 0,
 			userId
 		]
 	});
@@ -604,6 +612,7 @@ export async function updateItem(
 		purchase_price: number | null;
 		quantity: number;
 		notes: string | null;
+		rating: number;
 	}>
 ): Promise<void> {
 	const db = getDb();
@@ -693,6 +702,7 @@ export async function getItemWithStats(userId: number, id: number): Promise<Item
 		quantity: (row.quantity as number) ?? 1,
 		notes: (row.notes as string) ?? null,
 		used_up_at: (row.used_up_at as string) ?? null,
+		rating: (row.rating as number) ?? 0,
 		created_at: row.created_at as string,
 		category_name: row.category_name as string,
 		category_icon: row.category_icon as string,
@@ -1858,7 +1868,8 @@ export async function loadHomeData(userId: number): Promise<HomeData> {
 			subcategory_id: (r.subcategory_id as number) ?? null, status: r.status as string,
 			purchase_price: price, purchase_date: (r.purchase_date as string) ?? null,
 			quantity: (r.quantity as number) ?? 1, notes: (r.notes as string) ?? null,
-			used_up_at: (r.used_up_at as string) ?? null, created_at: r.created_at as string,
+			used_up_at: (r.used_up_at as string) ?? null, rating: (r.rating as number) ?? 0,
+			created_at: r.created_at as string,
 			category_name: r.category_name as string, category_icon: r.category_icon as string,
 			subcategory_name: (r.subcategory_name as string) ?? undefined,
 			usage_count: usageCount, cost_per_use: price && usageCount > 0 ? price / usageCount : null
@@ -1879,6 +1890,7 @@ export interface PanProjectItem {
 	item_name: string;
 	category_name: string;
 	category_icon: string;
+	rating: number;
 }
 
 export interface PanProjectStats {
@@ -1897,7 +1909,7 @@ export async function addPanItem(userId: number, itemId: number, quantity: numbe
 export async function getPanItems(userId: number): Promise<PanProjectItem[]> {
 	const db = getDb();
 	const result = await db.execute({
-		sql: `SELECT pp.*, i.name as item_name, c.name as category_name, c.icon as category_icon
+		sql: `SELECT pp.*, i.name as item_name, i.rating as item_rating, c.name as category_name, c.icon as category_icon
 			FROM pan_project_items pp
 			JOIN items i ON pp.item_id = i.id
 			JOIN categories c ON i.category_id = c.id
@@ -1913,7 +1925,8 @@ export async function getPanItems(userId: number): Promise<PanProjectItem[]> {
 		created_at: r.created_at as string,
 		item_name: r.item_name as string,
 		category_name: r.category_name as string,
-		category_icon: r.category_icon as string
+		category_icon: r.category_icon as string,
+		rating: (r.item_rating as number) ?? 0
 	}));
 }
 
@@ -1954,6 +1967,7 @@ export interface ShoppingItem {
 	quantity: number;
 	checked: number;
 	notes: string | null;
+	rating: number;
 	created_at: string;
 }
 
@@ -1961,12 +1975,13 @@ export async function addShoppingItem(
 	userId: number,
 	name: string,
 	quantity?: number,
-	notes?: string | null
+	notes?: string | null,
+	rating?: number
 ): Promise<void> {
 	const db = getDb();
 	await db.execute({
-		sql: 'INSERT INTO shopping_list (name, quantity, notes, user_id) VALUES (?, ?, ?, ?)',
-		args: [name, quantity ?? 1, notes ?? null, userId]
+		sql: 'INSERT INTO shopping_list (name, quantity, notes, rating, user_id) VALUES (?, ?, ?, ?, ?)',
+		args: [name, quantity ?? 1, notes ?? null, rating ?? 0, userId]
 	});
 }
 
@@ -1982,6 +1997,7 @@ export async function getShoppingList(userId: number): Promise<ShoppingItem[]> {
 		quantity: r.quantity as number,
 		checked: r.checked as number,
 		notes: (r.notes as string) ?? null,
+		rating: (r.rating as number) ?? 0,
 		created_at: r.created_at as string
 	}));
 }
@@ -2061,6 +2077,7 @@ export async function updateShoppingItem(
 		name: string;
 		quantity: number;
 		notes: string | null;
+		rating: number;
 	}>
 ): Promise<void> {
 	const db = getDb();

@@ -7,6 +7,7 @@
 	/** @typedef {import('$lib/db/queries').Category} Category */
 	/** @typedef {import('$lib/db/queries').Subcategory} Subcategory */
 	import { t } from '$lib/i18n/index.svelte';
+	import StarRating from './StarRating.svelte';
 
 	let auth = getAuthState();
 
@@ -31,6 +32,7 @@
 	let editPrice = $state('');
 	let editQuantity = $state(1);
 	let editNotes = $state('');
+	let editRating = $state(0);
 	/** @type {Category[]} */
 	let categories = $state([]);
 	/** @type {Subcategory[]} */
@@ -151,6 +153,7 @@
 		editPrice = displayItem.purchase_price != null ? String(displayItem.purchase_price) : '';
 		editQuantity = displayItem.quantity ?? 1;
 		editNotes = displayItem.notes ?? '';
+		editRating = displayItem.rating ?? 0;
 		categories = await getCategories();
 		if (displayItem.category_id) {
 			subcategories = await getSubcategories(displayItem.category_id);
@@ -176,7 +179,8 @@
 				subcategory_id: editSubcategoryId > 0 ? editSubcategoryId : null,
 				purchase_price: editPrice ? Number(editPrice) : null,
 				quantity: editQuantity > 0 ? editQuantity : 1,
-				notes: editNotes || null
+				notes: editNotes || null,
+				rating: editRating
 			});
 			triggerRefresh();
 			await loadData(displayItem.id);
@@ -323,6 +327,11 @@
 							></textarea>
 						</div>
 
+						<div class="form-group">
+							<label>{t.common.rating}</label>
+							<StarRating rating={editRating} onRate={(v) => editRating = v} size="md" />
+						</div>
+
 						<div class="edit-actions">
 							<button class="save-btn" onclick={handleSave} disabled={loading}>
 								{loading ? t.itemDetail.saving : t.itemDetail.save}
@@ -348,6 +357,13 @@
 						</div>
 					</div>
 				{:else}
+					<!-- Rating -->
+					{#if displayItem.rating > 0}
+						<div class="detail-rating">
+							<StarRating rating={displayItem.rating} />
+						</div>
+					{/if}
+
 					<!-- Stats Row -->
 					<div class="stats-row">
 						<div class="stat-block">
@@ -579,6 +595,10 @@
 	.close-btn:active {
 		background: rgba(0, 0, 0, 0.04);
 		transform: scale(0.95);
+	}
+
+	.detail-rating {
+		padding: 8px 20px 0;
 	}
 
 	/* Stats Row */

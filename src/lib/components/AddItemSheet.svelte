@@ -12,6 +12,7 @@
 		type Category,
 		type Subcategory
 	} from '$lib/db/queries';
+	import StarRating from './StarRating.svelte';
 
 	let { onAdded }: { onAdded?: () => void } = $props();
 
@@ -35,6 +36,7 @@
 	let quantity = $state(1);
 	let purchaseDate = $state('');
 	let notes = $state('');
+	let rating = $state(0);
 
 	// Load subcategories reactively when category changes.
 	// This must use $effect because getSubcategories is an async DB call
@@ -126,6 +128,7 @@
 		quantity = 1;
 		purchaseDate = '';
 		notes = '';
+		rating = 0;
 		subcategories = [];
 	}
 
@@ -152,7 +155,8 @@
 				purchasePrice ? Number(purchasePrice) : null,
 				purchaseDate || null,
 				quantity,
-				notes || null
+				notes || null,
+				rating
 			);
 			closeModal();
 			resetForm();
@@ -264,6 +268,11 @@
 						rows="3"
 						placeholder={t.addModal.optionalNotes}
 					></textarea>
+				</div>
+
+				<div class="form-group">
+					<label>{t.common.rating}</label>
+					<StarRating {rating} onRate={(v) => rating = v} size="md" />
 				</div>
 
 				<button type="submit" class="submit-btn" disabled={submitting}>

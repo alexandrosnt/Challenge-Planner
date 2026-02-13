@@ -2,6 +2,7 @@
 	import ProgressBar from '$lib/components/ProgressBar.svelte';
 	import SelectableCheckbox from './SelectableCheckbox.svelte';
 	import { t } from '$lib/i18n/index.svelte';
+	import StarRating from './StarRating.svelte';
 
 	interface PanItem {
 		id: number;
@@ -11,6 +12,7 @@
 		item_name: string;
 		category_name: string;
 		category_icon: string;
+		rating: number;
 	}
 
 	let {
@@ -68,6 +70,9 @@
 		<div class="item-info">
 			<h4 class="item-name">{item.item_name}</h4>
 			<span class="category-name">{item.category_name}</span>
+			{#if item.rating > 0}
+				<StarRating rating={item.rating} />
+			{/if}
 		</div>
 	</div>
 

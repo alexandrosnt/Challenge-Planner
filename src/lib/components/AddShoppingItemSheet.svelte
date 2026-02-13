@@ -6,6 +6,7 @@
 	import { triggerRefresh } from '$lib/stores/refresh.svelte';
 	import { t } from '$lib/i18n/index.svelte';
 	import { lookupBarcode } from '$lib/api/openfoodfacts';
+	import StarRating from './StarRating.svelte';
 
 	let { onAdded }: { onAdded?: () => void } = $props();
 
@@ -14,6 +15,7 @@
 	let name = $state('');
 	let quantity = $state(1);
 	let notes = $state('');
+	let rating = $state(0);
 	let submitting = $state(false);
 
 	let isMobile = $state(false);
@@ -96,7 +98,7 @@
 		if (!userId) return;
 		submitting = true;
 		try {
-			await addShoppingItem(userId, name.trim(), quantity, notes.trim() || null);
+			await addShoppingItem(userId, name.trim(), quantity, notes.trim() || null, rating);
 			closeModal();
 			triggerRefresh();
 			onAdded?.();
@@ -168,6 +170,11 @@
 						rows="3"
 						placeholder={t.addModal.optionalNotes}
 					></textarea>
+				</div>
+
+				<div class="form-group">
+					<label>{t.common.rating}</label>
+					<StarRating {rating} onRate={(v) => rating = v} size="md" />
 				</div>
 
 				<button type="submit" class="submit-btn" disabled={submitting}>

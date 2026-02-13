@@ -50,6 +50,7 @@ CREATE TABLE IF NOT EXISTS items (
 	quantity INTEGER DEFAULT 1,
 	notes TEXT,
 	used_up_at TEXT,
+	rating INTEGER DEFAULT 0,
 	user_id INTEGER NOT NULL DEFAULT 1,
 	created_at TEXT NOT NULL DEFAULT (datetime('now')),
 	FOREIGN KEY (category_id) REFERENCES categories(id),
@@ -189,6 +190,7 @@ CREATE TABLE IF NOT EXISTS shopping_list (
 	quantity INTEGER NOT NULL DEFAULT 1,
 	checked INTEGER NOT NULL DEFAULT 0,
 	notes TEXT,
+	rating INTEGER DEFAULT 0,
 	user_id INTEGER NOT NULL,
 	created_at TEXT NOT NULL DEFAULT (datetime('now')),
 	FOREIGN KEY (user_id) REFERENCES users(id)

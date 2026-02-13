@@ -5,9 +5,11 @@
         quantity: number;
         checked: number;
         notes: string | null;
+        rating: number;
     }
 
     import SelectableCheckbox from './SelectableCheckbox.svelte';
+    import StarRating from './StarRating.svelte';
 
     interface Props {
         item: ShoppingItem;
@@ -51,6 +53,9 @@
                 <span class="quantity-badge">&times;{item.quantity}</span>
             {/if}
         </div>
+        {#if item.rating > 0}
+            <StarRating rating={item.rating} />
+        {/if}
         {#if item.notes}
             <span class="item-notes">{item.notes}</span>
         {/if}

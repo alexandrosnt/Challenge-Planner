@@ -9,6 +9,7 @@
     import { dragscroll } from '$lib/actions/dragscroll';
     import { getRefreshSignal, triggerRefresh } from '$lib/stores/refresh.svelte';
     import { t } from '$lib/i18n/index.svelte';
+    import StarRating from '$lib/components/StarRating.svelte';
 
     let auth = getAuthState();
 
@@ -267,6 +268,7 @@
                             <div class="list-item-info">
                                 <h3 class="list-item-name">{item.name}{#if item.quantity > 1} <span class="qty-badge">x{item.quantity}</span>{/if}</h3>
                                 <span class="list-item-sub">{item.subcategory_name || item.category_name}</span>
+                                {#if item.rating > 0}<StarRating rating={item.rating} />{/if}
                             </div>
                             <div class="list-item-right">
                                 <span class="list-status-badge" class:status-active={item.status === 'active'} class:status-finished={item.status === 'used_up'} class:status-decluttered={item.status === 'decluttered'}>
@@ -295,6 +297,7 @@
                             <div class="list-item-info">
                                 <h3 class="list-item-name">{item.name}{#if item.quantity > 1} <span class="qty-badge">x{item.quantity}</span>{/if}</h3>
                                 <span class="list-item-sub">{item.subcategory_name || item.category_name}</span>
+                                {#if item.rating > 0}<StarRating rating={item.rating} />{/if}
                             </div>
                             <div class="list-item-right">
                                 <button class="inline-delete-btn" onclick={(e) => handleInlineDelete(e, item.id)} aria-label={t.inventory.deleteItem}>
