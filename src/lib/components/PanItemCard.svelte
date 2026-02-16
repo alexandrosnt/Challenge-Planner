@@ -21,6 +21,10 @@
 		onUndoEmptied,
 		onRemove,
 		onEdit,
+		editing = false,
+		editQuantity = $bindable(1),
+		onSaveEdit,
+		onCancelEdit,
 		selectMode = false,
 		selected = false,
 		onSelect,
@@ -30,6 +34,10 @@
 		onUndoEmptied?: (id: number) => void;
 		onRemove?: (id: number) => void;
 		onEdit?: (id: number) => void;
+		editing?: boolean;
+		editQuantity?: number;
+		onSaveEdit?: () => void;
+		onCancelEdit?: () => void;
 		selectMode?: boolean;
 		selected?: boolean;
 		onSelect?: (id: number) => void;
@@ -78,39 +86,60 @@
 		{/if}
 	</div>
 
-	<div class="progress-section">
-		<div class="progress-text">
-			<span class="progress-label">{t.panProject.progress}</span>
-			<span class="progress-count">{item.emptied} {t.panProject.of} {item.quantity} {t.panProject.emptied}</span>
+	{#if editing}
+		<div class="inline-edit">
+			<label class="edit-label" for="edit-qty-{item.id}">{t.panProject.editQuantity}</label>
+			<input
+				id="edit-qty-{item.id}"
+				class="edit-input"
+				type="number"
+				min="1"
+				bind:value={editQuantity}
+			/>
+			<div class="edit-actions">
+				<button class="edit-btn-cancel" onclick={onCancelEdit}>
+					{t.common.cancel}
+				</button>
+				<button class="edit-btn-save" onclick={onSaveEdit}>
+					{t.panProject.save}
+				</button>
+			</div>
 		</div>
-		<ProgressBar value={percentage} height="8px" />
-	</div>
+	{:else}
+		<div class="progress-section">
+			<div class="progress-text">
+				<span class="progress-label">{t.panProject.progress}</span>
+				<span class="progress-count">{item.emptied} {t.panProject.of} {item.quantity} {t.panProject.emptied}</span>
+			</div>
+			<ProgressBar value={percentage} height="8px" />
+		</div>
 
-	<div class="btn-row">
-		{#if onUndoEmptied && item.emptied > 0}
-			<button
-				class="undo-emptied-btn"
-				onclick={() => onUndoEmptied(item.id)}
-			>
-				<i class="ri-arrow-go-back-line"></i>
-				{t.panProject.undoEmptied}
-			</button>
-		{/if}
-		{#if onMarkEmptied}
-			<button
-				class="mark-emptied-btn"
-				class:complete={isComplete}
-				onclick={() => onMarkEmptied(item.id)}
-			>
-				{#if isComplete}
-					<i class="ri-check-double-line"></i>
-				{:else}
-					<i class="ri-check-line"></i>
-				{/if}
-				{t.panProject.markEmptied}
-			</button>
-		{/if}
-	</div>
+		<div class="btn-row">
+			{#if onUndoEmptied && item.emptied > 0}
+				<button
+					class="undo-emptied-btn"
+					onclick={() => onUndoEmptied(item.id)}
+				>
+					<i class="ri-arrow-go-back-line"></i>
+					{t.panProject.undoEmptied}
+				</button>
+			{/if}
+			{#if onMarkEmptied}
+				<button
+					class="mark-emptied-btn"
+					class:complete={isComplete}
+					onclick={() => onMarkEmptied(item.id)}
+				>
+					{#if isComplete}
+						<i class="ri-check-double-line"></i>
+					{:else}
+						<i class="ri-check-line"></i>
+					{/if}
+					{t.panProject.markEmptied}
+				</button>
+			{/if}
+		</div>
+	{/if}
 </div>
 
 <style>
@@ -288,5 +317,78 @@
 
 	.mark-emptied-btn:disabled {
 		opacity: 0.85;
+	}
+
+	.inline-edit {
+		display: flex;
+		flex-direction: column;
+		gap: 10px;
+	}
+
+	.edit-label {
+		font-size: 13px;
+		font-weight: 600;
+		color: var(--text-soft);
+		text-transform: uppercase;
+		letter-spacing: 0.5px;
+	}
+
+	.edit-input {
+		width: 100%;
+		padding: 10px 14px;
+		border: 1px solid var(--glass-border);
+		border-radius: var(--radius-s);
+		font-family: 'Poppins', sans-serif;
+		font-size: 15px;
+		color: var(--text-dark);
+		background: white;
+		outline: none;
+		transition: border-color 0.2s;
+		box-sizing: border-box;
+	}
+
+	.edit-input:focus {
+		border-color: var(--accent-primary, #6366f1);
+	}
+
+	.edit-actions {
+		display: flex;
+		gap: 10px;
+	}
+
+	.edit-btn-cancel,
+	.edit-btn-save {
+		flex: 1;
+		padding: 10px;
+		border-radius: 50px;
+		font-family: 'Poppins', sans-serif;
+		font-size: 14px;
+		font-weight: 600;
+		cursor: pointer;
+		transition: 0.2s;
+		-webkit-tap-highlight-color: transparent;
+		touch-action: manipulation;
+	}
+
+	.edit-btn-cancel {
+		border: 1px solid rgba(0, 0, 0, 0.06);
+		background: white;
+		color: var(--text-soft);
+	}
+
+	.edit-btn-cancel:active {
+		transform: scale(0.98);
+		background: #f5f5f5;
+	}
+
+	.edit-btn-save {
+		border: none;
+		background: var(--accent-primary, #6366f1);
+		color: white;
+	}
+
+	.edit-btn-save:active {
+		transform: scale(0.98);
+		opacity: 0.9;
 	}
 </style>

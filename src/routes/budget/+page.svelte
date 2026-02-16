@@ -5,7 +5,7 @@
     import ProgressBar from '$lib/components/ProgressBar.svelte';
     import SelectModeButton from '$lib/components/SelectModeButton.svelte';
     import SelectionBar from '$lib/components/SelectionBar.svelte';
-    import { getBudgetWithSpending, getPurchases, getCategories, updateBudget, deleteBudget, deleteBudgets, updatePurchase, deletePurchase, deletePurchases, type Budget, type Purchase, type Category } from '$lib/db/queries';
+    import { getBudgetWithSpending, getPurchases, getTotalSpentForMonth, getCategories, updateBudget, deleteBudget, deleteBudgets, updatePurchase, deletePurchase, deletePurchases, type Budget, type Purchase, type Category } from '$lib/db/queries';
     import { getAuthState } from '$lib/stores/auth.svelte';
     import { openModal } from '$lib/stores/modal.svelte';
     import { t } from '$lib/i18n/index.svelte';
@@ -13,11 +13,15 @@
     let auth = getAuthState();
     let refresh = getRefreshSignal();
 
+    const PAGE_SIZE = 20;
+
     let budgets = $state<Budget[]>([]);
     let purchases = $state<Purchase[]>([]);
     let totalSpent = $state(0);
     let loading = $state(true);
     let currentMonth = $state(new Date().toISOString().slice(0, 7));
+    let purchasePage = $state(0);
+    let purchaseHasMore = $state(false);
 
     // Edit state
     let editingId: number | null = $state(null);
@@ -130,25 +134,37 @@
         const [y, m] = currentMonth.split('-').map(Number);
         const d = new Date(y, m - 2);
         currentMonth = d.toISOString().slice(0, 7);
+        purchasePage = 0;
     }
 
     function nextMonth() {
         const [y, m] = currentMonth.split('-').map(Number);
         const d = new Date(y, m);
         currentMonth = d.toISOString().slice(0, 7);
+        purchasePage = 0;
+    }
+
+    function prevPurchasePage() {
+        if (purchasePage > 0) { purchasePage--; loadData(); }
+    }
+
+    function nextPurchasePage() {
+        if (purchaseHasMore) { purchasePage++; loadData(); }
     }
 
     async function loadData() {
         const userId = auth.currentUser?.id;
         if (!userId) return;
         try {
-            const [b, p] = await Promise.all([
+            const [b, spent, p] = await Promise.all([
                 getBudgetWithSpending(userId, currentMonth),
-                getPurchases(userId, undefined, currentMonth),
+                getTotalSpentForMonth(userId, currentMonth),
+                getPurchases(userId, undefined, currentMonth, PAGE_SIZE + 1, purchasePage * PAGE_SIZE),
             ]);
             budgets = b;
-            purchases = p;
-            totalSpent = p.reduce((sum, p) => sum + p.amount, 0);
+            totalSpent = spent;
+            purchaseHasMore = p.length > PAGE_SIZE;
+            purchases = p.slice(0, PAGE_SIZE);
         } catch (e) {
             console.error('Failed to load budget data:', e);
         } finally {
@@ -469,10 +485,10 @@
         {/if}
 
         <!-- Recent Purchases -->
-        {#if purchases.length > 0}
-            <SectionTitle title={t.budgetPage.totalSpending} actionText={String(purchases.length)} />
+        {#if purchases.length > 0 || purchasePage > 0}
+            <SectionTitle title={t.budgetPage.totalSpending} actionText="{t.common.page} {purchasePage + 1}" />
             <GlassCard>
-                {#each purchases.slice(0, 10) as purchase (purchase.id)}
+                {#each purchases as purchase (purchase.id)}
                     {#if editPurchaseId === purchase.id}
                         <div class="purchase-edit-form">
                             <div class="form-group">
@@ -537,6 +553,17 @@
                     {/if}
                 {/each}
             </GlassCard>
+            {#if purchasePage > 0 || purchaseHasMore}
+                <div class="pagination-row">
+                    <button class="page-btn" onclick={prevPurchasePage} disabled={purchasePage === 0}>
+                        <i class="ri-arrow-left-s-line"></i>
+                    </button>
+                    <span class="page-indicator">{purchasePage + 1}</span>
+                    <button class="page-btn" onclick={nextPurchasePage} disabled={!purchaseHasMore}>
+                        <i class="ri-arrow-right-s-line"></i>
+                    </button>
+                </div>
+            {/if}
         {/if}
 
     {/if}
@@ -926,5 +953,44 @@
     .selected-row {
         background: rgba(233, 30, 99, 0.04);
         border-radius: 8px;
+    }
+    .pagination-row {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 16px;
+        padding: 16px 0 8px;
+    }
+    .page-btn {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        border: 1px solid rgba(0, 0, 0, 0.06);
+        background: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        font-size: 20px;
+        color: var(--text-soft);
+        transition: 0.2s;
+        -webkit-tap-highlight-color: transparent;
+        touch-action: manipulation;
+    }
+    .page-btn:active:not(:disabled) {
+        transform: scale(0.9);
+        background: #f5f5f5;
+    }
+    .page-btn:disabled {
+        opacity: 0.3;
+        cursor: default;
+    }
+    .page-indicator {
+        font-family: 'Poppins', sans-serif;
+        font-size: 15px;
+        font-weight: 700;
+        color: var(--text-dark);
+        min-width: 24px;
+        text-align: center;
     }
 </style>

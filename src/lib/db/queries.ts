@@ -752,7 +752,9 @@ export async function addPurchase(
 export async function getPurchases(
 	userId: number,
 	categoryId?: number,
-	month?: string
+	month?: string,
+	limit: number = 0,
+	offset: number = 0
 ): Promise<Purchase[]> {
 	const db = getDb();
 	let sql = `SELECT p.*, c.name as category_name
@@ -771,6 +773,10 @@ export async function getPurchases(
 
 	sql += ' WHERE ' + conditions.join(' AND ');
 	sql += ' ORDER BY p.purchase_date DESC, p.created_at DESC';
+	if (limit > 0) {
+		sql += ' LIMIT ? OFFSET ?';
+		args.push(limit, offset);
+	}
 	const result = await db.execute({ sql, args });
 	return result.rows.map((row) => ({
 		id: row.id as number,
@@ -790,9 +796,14 @@ export async function getPurchases(
 export async function getTotalSpentThisMonth(userId: number, categoryId?: number): Promise<number> {
 	const db = getDb();
 	const currentMonth = new Date().toISOString().slice(0, 7);
+	return getTotalSpentForMonth(userId, currentMonth, categoryId);
+}
+
+export async function getTotalSpentForMonth(userId: number, month: string, categoryId?: number): Promise<number> {
+	const db = getDb();
 	let sql = `SELECT COALESCE(SUM(amount), 0) as total FROM purchases
 		WHERE user_id = ? AND strftime('%Y-%m', purchase_date) = ?`;
-	const args: (string | number)[] = [userId, currentMonth];
+	const args: (string | number)[] = [userId, month];
 
 	if (categoryId) {
 		sql += ' AND category_id = ?';
@@ -1911,17 +1922,20 @@ export async function addPanItem(userId: number, itemId: number, quantity: numbe
 	});
 }
 
-export async function getPanItems(userId: number): Promise<PanProjectItem[]> {
+export async function getPanItems(userId: number, limit: number = 0, offset: number = 0): Promise<PanProjectItem[]> {
 	const db = getDb();
-	const result = await db.execute({
-		sql: `SELECT pp.*, i.name as item_name, i.rating as item_rating, c.name as category_name, c.icon as category_icon
-			FROM pan_project_items pp
-			JOIN items i ON pp.item_id = i.id
-			JOIN categories c ON i.category_id = c.id
-			WHERE pp.user_id = ?
-			ORDER BY pp.created_at DESC`,
-		args: [userId]
-	});
+	let sql = `SELECT pp.*, i.name as item_name, i.rating as item_rating, c.name as category_name, c.icon as category_icon
+		FROM pan_project_items pp
+		JOIN items i ON pp.item_id = i.id
+		JOIN categories c ON i.category_id = c.id
+		WHERE pp.user_id = ?
+		ORDER BY pp.created_at DESC`;
+	const args: (number)[] = [userId];
+	if (limit > 0) {
+		sql += ' LIMIT ? OFFSET ?';
+		args.push(limit, offset);
+	}
+	const result = await db.execute({ sql, args });
 	return result.rows.map(r => ({
 		id: r.id as number,
 		item_id: r.item_id as number,

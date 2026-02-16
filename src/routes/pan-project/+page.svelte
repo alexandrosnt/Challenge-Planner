@@ -13,9 +13,13 @@
     let auth = getAuthState();
     let refresh = getRefreshSignal();
 
+    const PAGE_SIZE = 20;
+
     let items = $state<PanProjectItem[]>([]);
     let stats = $state<PanProjectStats | null>(null);
     let loading = $state(true);
+    let panPage = $state(0);
+    let panHasMore = $state(false);
 
     let editingId: number | null = $state(null);
     let editQuantity = $state(1);
@@ -79,15 +83,26 @@
         const userId = auth.currentUser?.id;
         if (!userId) return;
         try {
-            [items, stats] = await Promise.all([
-                getPanItems(userId),
+            const [rawItems, s] = await Promise.all([
+                getPanItems(userId, PAGE_SIZE + 1, panPage * PAGE_SIZE),
                 getPanProjectStats(userId)
             ]);
+            panHasMore = rawItems.length > PAGE_SIZE;
+            items = rawItems.slice(0, PAGE_SIZE);
+            stats = s;
         } catch (e) {
             console.error('Failed to load pan project data:', e);
         } finally {
             loading = false;
         }
+    }
+
+    function prevPanPage() {
+        if (panPage > 0) { panPage--; loadData(); }
+    }
+
+    function nextPanPage() {
+        if (panHasMore) { panPage++; loadData(); }
     }
 
     async function handleMarkEmptied(panItemId: number) {
@@ -195,7 +210,7 @@
                 {/if}
             </div>
 
-            <SectionTitle title={t.panProject.progress} actionText="{filteredItems.length} {t.common.items}" />
+            <SectionTitle title={t.panProject.progress} actionText="{t.common.page} {panPage + 1}" />
             {#each filteredItems as item (item.id)}
                 <PanItemCard
                     {item}
@@ -203,33 +218,26 @@
                     onUndoEmptied={selectMode ? undefined : handleUndoEmptied}
                     onRemove={selectMode ? undefined : handleRemove}
                     onEdit={selectMode ? undefined : startEdit}
+                    editing={editingId === item.id}
+                    bind:editQuantity
+                    onSaveEdit={handleSaveQuantity}
+                    onCancelEdit={cancelEdit}
                     {selectMode}
                     selected={selectedIds.has(item.id)}
                     onSelect={toggleSelection}
                 />
             {/each}
 
-            {#if editingId !== null}
-                <GlassCard>
-                    <div class="edit-form">
-                        <label class="edit-label" for="edit-quantity">{t.panProject.editQuantity}</label>
-                        <input
-                            id="edit-quantity"
-                            class="edit-input"
-                            type="number"
-                            min="1"
-                            bind:value={editQuantity}
-                        />
-                        <div class="edit-actions">
-                            <button class="edit-btn-cancel" onclick={cancelEdit} disabled={saving}>
-                                {t.common.cancel}
-                            </button>
-                            <button class="edit-btn-save" onclick={handleSaveQuantity} disabled={saving}>
-                                {saving ? t.panProject.saving : t.panProject.save}
-                            </button>
-                        </div>
-                    </div>
-                </GlassCard>
+            {#if panPage > 0 || panHasMore}
+                <div class="pagination-row">
+                    <button class="page-btn" onclick={prevPanPage} disabled={panPage === 0}>
+                        <i class="ri-arrow-left-s-line"></i>
+                    </button>
+                    <span class="page-indicator">{panPage + 1}</span>
+                    <button class="page-btn" onclick={nextPanPage} disabled={!panHasMore}>
+                        <i class="ri-arrow-right-s-line"></i>
+                    </button>
+                </div>
             {/if}
         {:else}
             <GlassCard>
@@ -356,73 +364,43 @@
         0% { background-position: 200% 0; }
         100% { background-position: -200% 0; }
     }
-    .edit-form {
+    .pagination-row {
         display: flex;
-        flex-direction: column;
-        gap: 14px;
+        align-items: center;
+        justify-content: center;
+        gap: 16px;
+        padding: 8px 0 16px;
     }
-    .edit-label {
-        font-size: 14px;
-        font-weight: 600;
-        color: var(--text-dark);
-    }
-    .edit-input {
-        width: 100%;
-        padding: 12px 14px;
-        border: 1px solid var(--glass-border);
-        border-radius: var(--radius-s);
-        font-family: 'Poppins', sans-serif;
-        font-size: 15px;
-        color: var(--text-dark);
-        background: white;
-        outline: none;
-        transition: border-color 0.2s;
-        box-sizing: border-box;
-    }
-    .edit-input:focus {
-        border-color: var(--accent-primary, #6366f1);
-    }
-    .edit-actions {
-        display: flex;
-        gap: 10px;
-    }
-    .edit-btn-cancel {
-        flex: 1;
-        padding: 12px;
+    .page-btn {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
         border: 1px solid rgba(0, 0, 0, 0.06);
-        border-radius: 50px;
         background: white;
-        font-family: 'Poppins', sans-serif;
-        font-size: 14px;
-        font-weight: 600;
-        color: var(--text-soft);
+        display: flex;
+        align-items: center;
+        justify-content: center;
         cursor: pointer;
+        font-size: 20px;
+        color: var(--text-soft);
         transition: 0.2s;
+        -webkit-tap-highlight-color: transparent;
+        touch-action: manipulation;
     }
-    .edit-btn-cancel:active:not(:disabled) {
-        transform: scale(0.98);
+    .page-btn:active:not(:disabled) {
+        transform: scale(0.9);
         background: #f5f5f5;
     }
-    .edit-btn-save {
-        flex: 1;
-        padding: 12px;
-        border: none;
-        border-radius: 50px;
-        background: var(--accent-primary, #6366f1);
+    .page-btn:disabled {
+        opacity: 0.3;
+        cursor: default;
+    }
+    .page-indicator {
         font-family: 'Poppins', sans-serif;
-        font-size: 14px;
-        font-weight: 600;
-        color: white;
-        cursor: pointer;
-        transition: 0.2s;
-    }
-    .edit-btn-save:active:not(:disabled) {
-        transform: scale(0.98);
-        opacity: 0.9;
-    }
-    .edit-btn-save:disabled,
-    .edit-btn-cancel:disabled {
-        opacity: 0.6;
-        cursor: not-allowed;
+        font-size: 15px;
+        font-weight: 700;
+        color: var(--text-dark);
+        min-width: 24px;
+        text-align: center;
     }
 </style>

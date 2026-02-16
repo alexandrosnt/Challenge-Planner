@@ -26,6 +26,7 @@ const en = {
 		confirmDeleteMultiple: 'Delete these items? This cannot be undone.',
 		delete: 'Delete',
 		rating: 'Rating',
+		page: 'Page',
 	},
 	nav: {
 		home: 'Home',

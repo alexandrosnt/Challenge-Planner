@@ -26,6 +26,7 @@ const de = {
 		confirmDeleteMultiple: 'Diese Artikel löschen? Dies kann nicht rückgängig gemacht werden.',
 		delete: 'Löschen',
 		rating: 'Bewertung',
+		page: 'Seite',
 	},
 	nav: {
 		home: 'Startseite',
