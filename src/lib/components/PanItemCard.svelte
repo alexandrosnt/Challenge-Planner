@@ -43,10 +43,16 @@
 		onSelect?: (id: number) => void;
 	} = $props();
 
+	let showDetail = $state(false);
+
 	let percentage = $derived(
 		item.quantity > 0 ? Math.round((item.emptied / item.quantity) * 100) : 0
 	);
 	let isComplete = $derived(item.emptied >= item.quantity);
+
+	function openDetail() {
+		if (!selectMode) showDetail = true;
+	}
 </script>
 
 <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -60,10 +66,14 @@
 		{#if selectMode}
 			<SelectableCheckbox checked={selected} onToggle={() => onSelect?.(item.id)} />
 		{/if}
-		<div class="icon-box">
+		<!-- svelte-ignore a11y_click_events_have_key_events -->
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<div class="icon-box" onclick={openDetail}>
 			<i class={item.category_icon}></i>
 		</div>
-		<div class="item-info">
+		<!-- svelte-ignore a11y_click_events_have_key_events -->
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<div class="item-info" onclick={openDetail}>
 			<h4 class="item-name">{item.item_name}</h4>
 			<span class="category-name">{item.category_name}</span>
 			{#if item.rating > 0}
@@ -141,6 +151,48 @@
 		</div>
 	{/if}
 </div>
+
+{#if showDetail}
+	<!-- svelte-ignore a11y_click_events_have_key_events -->
+	<!-- svelte-ignore a11y_no_static_element_interactions -->
+	<div class="detail-backdrop" onclick={() => showDetail = false}>
+		<!-- svelte-ignore a11y_click_events_have_key_events -->
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<div class="detail-sheet" onclick={(e) => e.stopPropagation()}>
+			<div class="detail-handle"></div>
+			<div class="detail-header">
+				<div class="detail-icon-box">
+					<i class={item.category_icon}></i>
+				</div>
+				<button class="detail-close" onclick={() => showDetail = false} aria-label="Close">
+					<i class="ri-close-line"></i>
+				</button>
+			</div>
+			<h3 class="detail-name">{item.item_name}</h3>
+			<span class="detail-category">{item.category_name}</span>
+			{#if item.rating > 0}
+				<div class="detail-rating">
+					<StarRating rating={item.rating} />
+				</div>
+			{/if}
+			<div class="detail-stats">
+				<div class="detail-stat">
+					<span class="detail-stat-value">{item.quantity}</span>
+					<span class="detail-stat-label">{t.panProject.quantity}</span>
+				</div>
+				<div class="detail-stat">
+					<span class="detail-stat-value">{item.emptied}</span>
+					<span class="detail-stat-label">{t.panProject.emptied}</span>
+				</div>
+				<div class="detail-stat">
+					<span class="detail-stat-value">{percentage}%</span>
+					<span class="detail-stat-label">{t.panProject.progress}</span>
+				</div>
+			</div>
+			<ProgressBar value={percentage} height="8px" />
+		</div>
+	</div>
+{/if}
 
 <style>
 	.pan-item-card {
@@ -390,5 +442,145 @@
 	.edit-btn-save:active {
 		transform: scale(0.98);
 		opacity: 0.9;
+	}
+
+	/* Item info tappable */
+	.icon-box, .item-info {
+		cursor: pointer;
+		-webkit-tap-highlight-color: transparent;
+	}
+
+	/* Detail Modal */
+	.detail-backdrop {
+		position: fixed;
+		inset: 0;
+		z-index: 200;
+		background: rgba(0, 0, 0, 0.4);
+		backdrop-filter: blur(4px);
+		-webkit-backdrop-filter: blur(4px);
+		display: flex;
+		align-items: flex-end;
+		justify-content: center;
+		animation: fadeIn 0.2s ease-out;
+	}
+
+	@keyframes fadeIn {
+		from { opacity: 0; }
+		to { opacity: 1; }
+	}
+
+	@keyframes slideUp {
+		from { transform: translateY(100%); }
+		to { transform: translateY(0); }
+	}
+
+	.detail-sheet {
+		width: 100%;
+		max-width: 500px;
+		background: #fdfbf7;
+		border-radius: var(--radius-l) var(--radius-l) 0 0;
+		padding: 0 24px calc(32px + env(safe-area-inset-bottom, 0px));
+		animation: slideUp 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+	}
+
+	.detail-handle {
+		width: 40px;
+		height: 4px;
+		background: rgba(0, 0, 0, 0.12);
+		border-radius: 2px;
+		margin: 12px auto 16px;
+	}
+
+	.detail-header {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		margin-bottom: 16px;
+	}
+
+	.detail-icon-box {
+		width: 52px;
+		height: 52px;
+		background: #FFF0F3;
+		border-radius: var(--radius-s);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		font-size: 26px;
+		color: var(--accent-pink);
+	}
+
+	.detail-close {
+		width: 36px;
+		height: 36px;
+		border-radius: 50%;
+		border: 1px solid rgba(0, 0, 0, 0.06);
+		background: white;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		cursor: pointer;
+		font-size: 20px;
+		color: var(--text-soft);
+		-webkit-tap-highlight-color: transparent;
+		touch-action: manipulation;
+	}
+
+	.detail-close:active {
+		background: rgba(0, 0, 0, 0.04);
+		transform: scale(0.95);
+	}
+
+	.detail-name {
+		font-family: 'Poppins', sans-serif;
+		font-size: 22px;
+		font-weight: 700;
+		color: var(--text-dark);
+		margin: 0 0 4px;
+		line-height: 1.3;
+		word-break: break-word;
+	}
+
+	.detail-category {
+		font-size: 13px;
+		font-weight: 500;
+		color: var(--text-soft);
+	}
+
+	.detail-rating {
+		margin-top: 8px;
+	}
+
+	.detail-stats {
+		display: flex;
+		gap: 8px;
+		margin: 20px 0 16px;
+	}
+
+	.detail-stat {
+		flex: 1;
+		background: var(--glass-bg, rgba(255, 255, 255, 0.6));
+		border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.3));
+		border-radius: var(--radius-m, 12px);
+		padding: 12px;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 4px;
+	}
+
+	.detail-stat-value {
+		font-family: 'Poppins', sans-serif;
+		font-size: 18px;
+		font-weight: 700;
+		color: var(--text-dark);
+	}
+
+	.detail-stat-label {
+		font-size: 11px;
+		font-weight: 500;
+		color: var(--text-soft);
+		text-transform: uppercase;
+		letter-spacing: 0.3px;
 	}
 </style>
