@@ -130,17 +130,19 @@
         return d.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
     }
 
+    function formatYM(d: Date): string {
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    }
+
     function prevMonth() {
         const [y, m] = currentMonth.split('-').map(Number);
-        const d = new Date(y, m - 2);
-        currentMonth = d.toISOString().slice(0, 7);
+        currentMonth = formatYM(new Date(y, m - 2));
         purchasePage = 0;
     }
 
     function nextMonth() {
         const [y, m] = currentMonth.split('-').map(Number);
-        const d = new Date(y, m);
-        currentMonth = d.toISOString().slice(0, 7);
+        currentMonth = formatYM(new Date(y, m));
         purchasePage = 0;
     }
 

@@ -196,6 +196,22 @@ CREATE TABLE IF NOT EXISTS shopping_list (
 	FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
+CREATE TABLE IF NOT EXISTS books (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	title TEXT NOT NULL,
+	author TEXT,
+	isbn TEXT,
+	cover_url TEXT,
+	total_pages INTEGER NOT NULL DEFAULT 0,
+	current_page INTEGER NOT NULL DEFAULT 0,
+	rating INTEGER NOT NULL DEFAULT 0,
+	status TEXT NOT NULL DEFAULT 'reading',
+	notes TEXT,
+	user_id INTEGER NOT NULL,
+	created_at TEXT NOT NULL DEFAULT (datetime('now')),
+	FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
 -- Performance indexes
 CREATE INDEX IF NOT EXISTS idx_items_category_id ON items(category_id);
 CREATE INDEX IF NOT EXISTS idx_items_status ON items(status);
@@ -218,6 +234,8 @@ CREATE INDEX IF NOT EXISTS idx_achievements_key ON achievements(key);
 CREATE INDEX IF NOT EXISTS idx_pan_project_items_user_id ON pan_project_items(user_id);
 CREATE INDEX IF NOT EXISTS idx_pan_project_items_item_id ON pan_project_items(item_id);
 CREATE INDEX IF NOT EXISTS idx_shopping_list_user_id ON shopping_list(user_id);
+CREATE INDEX IF NOT EXISTS idx_books_user_id ON books(user_id);
+CREATE INDEX IF NOT EXISTS idx_books_status ON books(status);
 `;
 
 export const USER_ID_INDEXES = `

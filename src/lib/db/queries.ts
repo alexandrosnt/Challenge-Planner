@@ -2,7 +2,7 @@ import { getDb } from './client';
 import { CREATE_TABLES, SEED_DATA, SEED_SUBCATEGORIES, ACHIEVEMENT_DEFINITIONS, USER_ID_INDEXES } from './schema';
 import type { InStatement } from './client';
 
-const CURRENT_SCHEMA_VERSION = 7;
+const CURRENT_SCHEMA_VERSION = 8;
 
 // --- Helpers ---
 
@@ -2202,4 +2202,143 @@ export async function deleteDeclutterLogEntries(userId: number, ids: number[]): 
 	const db = getDb();
 	const placeholders = ids.map(() => '?').join(',');
 	await db.execute({ sql: `DELETE FROM declutter_log WHERE id IN (${placeholders}) AND user_id = ?`, args: [...ids, userId] });
+}
+
+// --- Books ---
+
+export interface Book {
+	id: number;
+	title: string;
+	author: string | null;
+	isbn: string | null;
+	cover_url: string | null;
+	total_pages: number;
+	current_page: number;
+	rating: number;
+	status: string;
+	notes: string | null;
+	user_id: number;
+	created_at: string;
+}
+
+export interface BookStats {
+	total: number;
+	completed: number;
+	reading: number;
+	totalPages: number;
+	pagesRead: number;
+}
+
+export async function addBook(
+	userId: number,
+	title: string,
+	author: string | null,
+	isbn: string | null,
+	coverUrl: string | null,
+	totalPages: number,
+	currentPage: number,
+	rating: number,
+	status: string,
+	notes: string | null
+): Promise<number> {
+	const db = getDb();
+	const result = await db.execute({
+		sql: `INSERT INTO books (title, author, isbn, cover_url, total_pages, current_page, rating, status, notes, user_id)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		args: [title, author, isbn, coverUrl, totalPages, currentPage, rating, status, notes, userId]
+	});
+	return Number(result.lastInsertRowid);
+}
+
+export async function getBooks(userId: number, limit: number = 0, offset: number = 0): Promise<Book[]> {
+	const db = getDb();
+	let sql = `SELECT * FROM books WHERE user_id = ? ORDER BY created_at DESC`;
+	const args: number[] = [userId];
+	if (limit > 0) {
+		sql += ' LIMIT ? OFFSET ?';
+		args.push(limit, offset);
+	}
+	const result = await db.execute({ sql, args });
+	return result.rows.map(r => ({
+		id: r.id as number,
+		title: r.title as string,
+		author: (r.author as string) ?? null,
+		isbn: (r.isbn as string) ?? null,
+		cover_url: (r.cover_url as string) ?? null,
+		total_pages: r.total_pages as number,
+		current_page: r.current_page as number,
+		rating: (r.rating as number) ?? 0,
+		status: r.status as string,
+		notes: (r.notes as string) ?? null,
+		user_id: r.user_id as number,
+		created_at: r.created_at as string
+	}));
+}
+
+export async function getBookStats(userId: number): Promise<BookStats> {
+	const db = getDb();
+	const result = await db.execute({
+		sql: `SELECT
+			COUNT(*) as total,
+			COALESCE(SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END), 0) as completed,
+			COALESCE(SUM(CASE WHEN status = 'reading' THEN 1 ELSE 0 END), 0) as reading,
+			COALESCE(SUM(total_pages), 0) as total_pages,
+			COALESCE(SUM(current_page), 0) as pages_read
+			FROM books WHERE user_id = ?`,
+		args: [userId]
+	});
+	const row = result.rows[0];
+	return {
+		total: row.total as number,
+		completed: row.completed as number,
+		reading: row.reading as number,
+		totalPages: row.total_pages as number,
+		pagesRead: row.pages_read as number
+	};
+}
+
+export async function updateBook(
+	userId: number,
+	id: number,
+	updates: Partial<Pick<Book, 'title' | 'author' | 'isbn' | 'cover_url' | 'total_pages' | 'current_page' | 'rating' | 'status' | 'notes'>>
+): Promise<void> {
+	const db = getDb();
+	const fields: string[] = [];
+	const args: (string | number | null)[] = [];
+	for (const [key, value] of Object.entries(updates)) {
+		fields.push(`${key} = ?`);
+		args.push(value as string | number | null);
+	}
+	if (fields.length === 0) return;
+	args.push(id, userId);
+	await db.execute({
+		sql: `UPDATE books SET ${fields.join(', ')} WHERE id = ? AND user_id = ?`,
+		args
+	});
+}
+
+export async function updateBookProgress(userId: number, id: number, currentPage: number): Promise<void> {
+	const db = getDb();
+	// Update page, auto-mark completed when current >= total
+	await db.execute({
+		sql: `UPDATE books SET current_page = ?,
+			status = CASE WHEN ? >= total_pages AND total_pages > 0 THEN 'completed' ELSE status END
+			WHERE id = ? AND user_id = ?`,
+		args: [currentPage, currentPage, id, userId]
+	});
+}
+
+export async function deleteBook(userId: number, id: number): Promise<void> {
+	const db = getDb();
+	await db.execute({
+		sql: 'DELETE FROM books WHERE id = ? AND user_id = ?',
+		args: [id, userId]
+	});
+}
+
+export async function deleteBooks(userId: number, ids: number[]): Promise<void> {
+	if (ids.length === 0) return;
+	const db = getDb();
+	const placeholders = ids.map(() => '?').join(',');
+	await db.execute({ sql: `DELETE FROM books WHERE id IN (${placeholders}) AND user_id = ?`, args: [...ids, userId] });
 }

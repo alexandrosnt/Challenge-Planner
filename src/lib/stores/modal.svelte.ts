@@ -3,6 +3,7 @@ export type ModalType =
 	| 'add-budget'
 	| 'add-purchase'
 	| 'add-shopping-item'
+	| 'add-book'
 	| 'inventory-picker-pan'
 	| 'inventory-picker-declutter'
 	| null;
